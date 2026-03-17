@@ -1,0 +1,63 @@
+<button id="sidebarToggle" class="btn btn-light sidebar-toggle" type="button">
+    <i class="fas fa-bars"></i>
+</button>
+
+<div class="sidebar">
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/dashboard">
+        <div class="sidebar-brand-icon">
+            <i class="fas fa-store"></i>
+        </div>
+        <div class="sidebar-brand-text mx-3">Casa de Empeños</div>
+    </a>
+    <% if (user) { %>
+    <div class="text-center text-white mb-2 px-2">
+        <small>Bienvenido <strong><%= user.nombre || user.username %></strong></small>
+    </div>
+    
+    <% } %>
+    
+    <hr class="sidebar-divider my-0">
+    
+    <ul class="nav flex-column">
+        <li class="nav-item">
+            <a class="nav-link <%= currentPage === 'dashboard' ? 'active' : '' %>" href="/dashboard">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= currentPage === 'cashflow' ? 'active' : '' %>" href="/cashflow">
+                <i class="fas fa-cash-register"></i>
+                <span>Flujo de Caja</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= currentPage === 'empenio' ? 'active' : '' %>" href="/empenio">
+                <i class="fas fa-gem"></i>
+                <span>Empeños</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= currentPage === 'interests' ? 'active' : '' %>" href="/interests">
+                <i class="fas fa-percent"></i>
+                <span>Intereses</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= currentPage === 'reports' ? 'active' : '' %>" href="/reports">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reportes</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= currentPage === 'settings' ? 'active' : '' %>" href="/settings">
+                <i class="fas fa-cog"></i>
+                <span>Configuración</span>
+            </a>
+        </li>
+    </ul>
+    <br>
+    <div class="d-flex justify-content-center mb-3">
+        <a href="/logout" class="btn btn-sm btn-outline-light">Cerrar sesión</a>
+    </div>
+</div>

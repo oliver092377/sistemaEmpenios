@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Empeños</title>
+    <style>
+        form { max-width: 100%; margin: auto; text-align: center;}
+        button:hover { background-color: #45a049; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f8f9fa; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #4CAF50; color: white; position: sticky; top: 0; }
+        #boton {
+            display: flex;
+            text-decoration: none;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #nuevo {
+            background-color: #CC0000; 
+            color: white; 
+            font-size: 120%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 12px 24px; 
+            margin-top: 15px; 
+            border: none; 
+            cursor: pointer; 
+            width: auto;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        #nuevo:hover {
+            background-color: #a30000;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .action-buttons button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-size: 14px;
+        }
+        .action-buttons .edit-btn {
+            background-color: #2196F3;
+            color: white;
+        }
+        .action-buttons .interest-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+        .action-buttons .details-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .action-buttons button:hover {
+            opacity: 0.9;
+        }
+        .filters-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .filters-container input, .filters-container select {
+            padding: 10px;
+            margin: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 180px;
+        }
+        .filters-container button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .filters-container button:hover {
+            background-color: #45a049;
+        }
+        .total-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #calcularTotal {
+            padding: 12px 24px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        #calcularTotal:hover {
+            background-color: #0b7dda;
+        }
+        #totalResultado {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header-container h1 {
+            color: #333;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-container">
+        <h1>Sistema de Empeños</h1>
+    </div>
+    
+    <a id="boton" href="/nuevo-empenio">
+        <button id="nuevo">Nuevo Empeño</button>
+    </a>    
+    
+    <div class="filters-container">
+        <h3>Filtros</h3>
+        <form action="/" method="GET">
+            <input type="text" name="nombres" placeholder="Buscar por nombre" value="<%= nombres || '' %>">
+            <input type="text" name="apellidos" placeholder="Buscar por apellidos" value="<%= apellidos || '' %>">
+            <input type="text" name="artefacto" placeholder="Buscar por artefacto" value="<%= artefacto || '' %>">
+            <input type="text" name="marca" placeholder="Buscar por marca" value="<%= marca || '' %>">
+            <input type="date" name="fecha" value="<%= fecha || '' %>">
+            <input type="number" name="monto" placeholder="Buscar por monto" value="<%= monto || '' %>">
+            <select name="propietario" id="propietario">
+                <option value="<%= propietario || '' %>"><%= propietario || 'Propietario' %></option>
+            </select>
+            
+            <button type="submit">Buscar</button>
+            <a href="/"><button type="button">Limpiar</button></a><br>
+        </form>
+    </div>
+    
+    <div class="total-section">
+        <button id="calcularTotal">Calcular total</button>
+        <div id="totalResultado">Total: S/0.00</div>
+    </div>
+    
+    <h3>Lista de empeños</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombres</th>
+                <th>Apellidos</th>
+                <th>Artefacto</th>
+                <th>Marca</th>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Estado</th>
+                <th>Propietario</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% empenios.forEach(emp => { %>
+                <tr>
+                    <td><%= emp.idEmpenios %></td>
+                    <td><%= emp.Nombres_Cliente %></td>
+                    <td><%= emp.Apellidos_Cliente %></td>
+                    <td><%= emp.Artefacto %></td>
+                    <td><%= emp.Marca %></td>
+                    <td><%= emp.Fecha.toISOString().split('T')[0] %></td>
+                    <td>S/<%= emp.Monto.toFixed(2) %></td>
+                    <td><%= emp.Estado %></td>
+                    <td><%= emp.Propietario %></td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="/editar-empenio/<%= emp.idEmpenios %>">
+                                <button class="edit-btn">Editar</button>
+                            </a>
+                            <a href="/agregar-interes/<%= emp.idEmpenios %>">
+                                <button class="interest-btn">Interés</button>
+                            </a>
+                            <a href="/empenios/<%= emp.idEmpenios %>/detalle">
+                                <button class="details-btn">Detalles</button>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+    
+    <script>
+        // Obtiene el propietario actual
+        var propietarioActual = "<%= propietario %>";
+    
+        // Lista de posibles propietarios
+        var propietarios = ["Tienda", "Orlando", "Oscar", "Oliver"];
+    
+        // Filtrar para evitar repetidos
+        var opcionesFiltradas = propietarios.filter(p => p !== propietarioActual);
+    
+        // Insertar las opciones en el select
+        var select = document.getElementById("propietario");
+        opcionesFiltradas.forEach(propietario => {
+            var option = document.createElement("option");
+            option.value = propietario;
+            option.textContent = propietario;
+            select.appendChild(option);
+        });
+        
+        // Colorear filas según estado
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll("tbody tr").forEach(row => {
+                let estado = row.cells[7].textContent.trim(); 
+                if (estado === "activo") {
+                    row.style.backgroundColor = "#90EE90"; 
+                } else if (estado === "Recogido") {
+                    row.style.backgroundColor = "#ADD8E6"; 
+                }
+                else if (estado === "Vendido") {
+                    row.style.backgroundColor = "#ffcccc"; 
+                }
+            });
+            
+            // Función para calcular el total de empeños activos
+            document.getElementById('calcularTotal').addEventListener('click', function() {
+                let total = 0;
+                const filas = document.querySelectorAll('tbody tr');
+                let contadorActivos = 0;
+                
+                if (filas.length === 0) {
+                    document.getElementById('totalResultado').textContent = "No hay empeños para calcular";
+                    return;
+                }
+                
+                filas.forEach(fila => {
+                    // Verificar si el estado es "activo" (columna 7)
+                    const estado = fila.cells[7].textContent.trim().toLowerCase();
+                    
+                    if (estado === "activo") {
+                        // Obtener el texto de la celda de monto (columna 6)
+                        const montoTexto = fila.cells[6].textContent;
+                        // Eliminar el símbolo de dólar si existe y convertir a número
+                        const montoValor = parseFloat(montoTexto.replace('S/', ''));
+                        
+                        if (!isNaN(montoValor)) {
+                            total += montoValor;
+                            contadorActivos++;
+                        }
+                    }
+                });
+                
+                // Formatear el total como moneda
+                const mensaje = contadorActivos > 0 
+                    ? `Total activos (${contadorActivos}): S/${total.toFixed(2)}` 
+                    : "No hay empeños activos";
+                
+                document.getElementById('totalResultado').textContent = mensaje;
+            });
+        });
+    </script>
+</body>
+</html>

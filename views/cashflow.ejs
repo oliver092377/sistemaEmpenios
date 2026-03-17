@@ -1,0 +1,603 @@
+<%- include('partials/header', {title: 'Flujo de Caja - Sistema de Empeños' , currentPage: 'cashflow' }) %>
+
+    <%- include('partials/sidebar', {currentPage: 'cashflow' }) %>
+
+        <div class="main-content">
+            <h1>
+                <%= user ? user.rol || user.username : 'Invitado' %>
+            </h1>
+            <!-- Page Heading -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 text-gray-800">Flujo de caja</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+                    <i class="fas fa-plus me-2"></i>Nueva Transacción
+                </button>
+            </div>
+
+            <!-- Contenido específico de la página de flujo de caja -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 font-weight-bold text-primary">Registrar Transacción</h6>
+                        </div>
+                        <div class="card-body">
+                            <!-- Formulario de transacción actualizado -->
+                            <form action="/cashflow/guardar-transaccion" method="POST" id="transactionForm">
+                                <div class="row">
+
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Tipo de Transacción</label>
+                                        <select class="form-select" id="transactionType" name="tipo" required>
+                                            <option value="">Seleccionar...</option>
+                                            <option value="entrada">Entrada</option>
+                                            <option value="salida">Salida</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Categoría</label>
+                                        <select class="form-select" id="transactionCategory" name="categoria" required>
+                                            <option value="">Seleccionar...</option>
+                                            <option value="empenio">Recogida de Empeño</option>
+                                            <option value="venta">Venta de Producto</option>
+                                            <option value="prestamo">Préstamo</option>
+                                            <option value="gasto">Gasto Operativo</option>
+                                            <option value="otro">Otro</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3 d-none" id="empenioPicker">
+                                        <label class="form-label">Seleccionar empeño (recogida o interés)</label>
+                                        <input type="text" class="form-control" id="empenioSearch" placeholder="Buscar por cliente, artefacto, marca o monto">
+                                        <input type="hidden" name="id_empenio" id="empenioId">
+                                        <div class="list-group mt-2" id="empenioResults"></div>
+                                        <small class="text-muted" id="empenioSelectedSummary"></small>
+                                    </div>
+
+
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Monto Total</label>
+                                        <input type="number" class="form-control" placeholder="S/ 0.00" step="0.01"
+                                            name="monto" required>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Monto Ganancia</label>
+                                        <input type="number" class="form-control" placeholder="S/ 0.00" step="0.01"
+                                            name="ganancia" id="transactionGanancia">
+
+
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Descripción</label>
+                                        <textarea class="form-control" rows="2" placeholder="Detalles de la transacción"
+                                            name="descripcion" required></textarea>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Nota (opcional)</label>
+                                        <textarea class="form-control" rows="2"
+                                            placeholder="Ej: 50 se pagó por depósito y lo demás en efectivo"
+                                            name="nota"></textarea>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Fecha</label>
+                                        <input type="date" class="form-control" name="fecha" id="fecha" required>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-save me-2"></i>Guardar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Transactions Table -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 font-weight-bold text-primary">Historial de Transacciones</h6>
+                            <div class="d-flex">
+                                <input type="text" class="form-control me-2" placeholder="Buscar...">
+                                <select class="form-select me-2" style="width: 150px;">
+                                    <option>Todas las categorías</option>
+                                    <option>Recogida de Empeño</option>
+                                    <option>Préstamo</option>
+                                    <option>Venta</option>
+                                    <option>Gasto</option>
+                                </select>
+                                <button class="btn btn-outline-primary">
+                                    <i class="fas fa-filter"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form class="row g-2 mb-3 align-items-end" method="get" action="/cashflow">
+                                <div class="col-auto">
+                                    <label class="form-label mb-0">Filtrar por tipo de periodo:</label>
+                                    <select class="form-select" name="filtro" id="filtroTipo"
+                                        onchange="toggleFiltroInput()">
+                                        <option value="dia" <%=filtro==='dia' ? 'selected' : '' %> >Día específico
+                                        </option>
+                                        <option value="mes" <%=filtro==='mes' ? 'selected' : '' %> >Mes específico
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="col-auto" id="filtroInputContainer">
+                                    <!-- El input se renderiza dinámicamente -->
+                                    <% if (filtro==='mes' ) { %>
+                                        <label class="form-label mb-0">Mes:</label>
+                                        <input type="month" class="form-control" name="mes" value="<%= mes %>">
+                                        <% } else { %>
+                                            <label class="form-label mb-0">Fecha:</label>
+                                            <input type="date" class="form-control" name="fecha" value="<%= fecha %>">
+                                            <% } %>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                                </div>
+                            </form>
+
+                            <script>
+                                function toggleFiltroInput() {
+                                    var tipo = document.getElementById('filtroTipo').value;
+                                    var container = document.getElementById('filtroInputContainer');
+                                    if (tipo === 'mes') {
+                                        container.innerHTML = `
+                                            <label class="form-label mb-0">Mes:</label>
+                                            <input type="month" class="form-control" name="mes" value="<%= mes %>">
+                                        `;
+                                    } else {
+                                        container.innerHTML = `
+                                            <label class="form-label mb-0">Fecha:</label>
+                                            <input type="date" class="form-control" name="fecha" value="<%= fecha %>">
+                                        `;
+                                    }
+                                }
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    toggleFiltroInput();
+                                });
+                            </script>
+                            <div class="table-responsive">
+                                <table class="table table-bordered transaction-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Tipo</th>
+                                            <th>Descripción</th>
+                                            <th>Categoría</th>
+                                            <th>Monto Total</th>
+                                            <th>Ganancia</th>
+                                            <th>Capital</th>
+                                            <th>Encargado</th>
+                                            <th>Nota</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% transacciones.forEach(transaccion=> { %>
+                                            <tr>
+                                                <td>
+                                                    <%= transaccion.fecha.toISOString().split('T')[0] %>
+                                                </td>
+                                                <td>
+                                                    <span
+                                                        class=" <%= transaccion.tipo === 'entrada' ? 'income' : 'expense' %>">
+                                                        <%= transaccion.tipo.charAt(0).toUpperCase() +
+                                                            transaccion.tipo.slice(1) %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <%= transaccion.descripcion %>
+                                                </td>
+
+
+                                                <td>
+                                                    <%= transaccion.categoria %>
+                                                </td>
+                                                <td
+                                                    class=" <%= transaccion.tipo === 'entrada' ? 'income' : 'expense' %>">
+                                                    S/ <%= transaccion.monto_total %>
+                                                </td>
+                                                <td
+                                                    class=" <%= transaccion.tipo === 'entrada' ? 'income' : 'expense' %>">
+                                                    S/ <%= transaccion.monto_ganancia %>
+                                                </td>
+                                                <td
+                                                    class=" <%= transaccion.tipo === 'entrada' ? 'income' : 'expense' %>">
+                                                    S/ <%= transaccion.monto_total-transaccion.monto_ganancia %>
+                                                </td>
+                                                <td>
+                                                    <%= user.nombre %>
+                                                </td>
+                                                <td>
+                                                    <% if (transaccion.nota) { %>
+                                                        <button type="button" class="btn btn-sm btn-info note-btn" data-nota="<%= transaccion.nota %>" title="Ver nota">
+                                                            <i class="fas fa-sticky-note"></i>
+                                                        </button>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-primary"
+                                                        data-id="<%= transaccion.id %>"
+                                                        data-nota="<%= transaccion.nota || '' %>">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <form action="/cashflow/eliminar-transaccion" method="POST"
+                                                        style="display:inline;"
+                                                        onsubmit="return confirm('¿Está seguro que desea eliminar esta transacción?');">
+                                                        <input type="hidden" name="id" value="<%= transaccion.id %>">
+                                                        <button type="submit" class="btn btn-sm btn-danger"><i
+                                                                class="fas fa-trash"></i></button>
+                                                    </form>
+                                                </td>
+
+                                            </tr>
+                                            <% }); %>
+
+
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <nav>
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" tabindex="-1">Anterior</a>
+                                    </li>
+                                    <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                    <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                    <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">Siguiente</a>
+                                    </li>
+                                </ul>
+                            </nav>
+
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Capital inicial y calculadora de día -->
+            <div class="row mb-3">
+                <div class="col-lg-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                            <label class="form-label mb-0 me-2">Capital inicial del día:</label>
+                            <input type="number" step="0.01" min="0" class="form-control" style="max-width: 180px;" id="initialCapitalInput" placeholder="Ej: 1000">
+                            <button class="btn btn-primary ms-2" id="calculateDaySummaryBtn">CALCULAR</button>
+                            <small class="text-muted ms-2">Suma entradas de capital, descuenta salidas y separa la ganancia.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Table - Current Day -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Transacciones del Día Actual</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered transaction-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Tipo</th>
+                                            <th>Descripción</th>
+                                            <th>Categoría</th>
+                                            <th>Monto Total</th>
+                                            <th>Ganancia</th>
+                                            <th>Capital</th>
+                                            <th>Encargado</th>
+                                            <th>Nota</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="currentDayTransactionsBody">
+                                        <tr>
+                                            <td colspan="10" class="text-center">Cargando...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div id="daySummaryResult" class="alert alert-info d-none mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cierre de caja diaria -->
+            <div class="row mb-3">
+                <div class="col-lg-12">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <% if (cierreAutorizado && !cajaCerradaHoy) { %>
+                            <button id="cerrarCajaBtn" class="btn btn-warning">
+                                <i class="fas fa-lock me-2"></i>Cerrar Caja
+                            </button>
+                        <% } else { %>
+                            <button class="btn btn-secondary" disabled>
+                                <i class="fas fa-lock me-2"></i>Cerrar Caja
+                            </button>
+                        <% } %>
+                        <small class="text-muted">Solo se puede cerrar una vez al día y requiere autorización del administrador.</small>
+                    </div>
+                    <div id="cerrarCajaMensaje" class="alert <%= cajaCerradaHoy ? 'alert-info mt-2' : 'd-none' %>">
+                        <% if (cajaCerradaHoy && resumenCaja) { %>
+                            Caja ya cerrada hoy. Capital: S/ <%= Number(resumenCaja.capital_final || 0).toFixed(2) %> | Ganancia: S/ <%= Number(resumenCaja.ganancia_dia || 0).toFixed(2) %> | Saldo final: S/ <%= Number(resumenCaja.saldo_final || 0).toFixed(2) %>
+                        <% } else if (!cierreAutorizado) { %>
+                            El administrador debe autorizar el cierre en Configuración.
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            
+            <!-- Transactions Table - Current Month -->
+            <% if (!user.isAdminUser) { %>
+                <div class="alert alert-warning mb-4">
+                    Solo el usuario administrador puede ver el resumen mensual
+                </div>
+            <% } else { %>
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Transacciones del Mes Actual</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered transaction-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Tipo</th>
+                                            <th>Descripción</th>
+                                            <th>Categoría</th>
+                                            <th>Monto Total</th>
+                                            <th>Ganancia</th>
+                                            <th>Capital</th>
+                                            <th>Encargado</th>
+                                            <th>Nota</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="currentMonthTransactionsBody">
+                                        <tr>
+                                            <td colspan="10" class="text-center">Cargando...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Charts -->
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Ganancias por mes</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="GananciaChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Flujo Mensual</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="flowChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal para Editar Transacción -->
+            <div class="modal fade" id="editTransactionModal" tabindex="-1" aria-labelledby="editTransactionModalLabel"
+                data-bs-backdrop="static" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form id="editTransactionForm" action="/cashflow/editar-transaccion" method="POST">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editTransactionModalLabel">Editar Transacción</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="id" id="editTransactionId">
+                                <div class="mb-3">
+                                    <label class="form-label">Tipo de Transacción</label>
+                                    <select class="form-select" id="editTransactionType" name="tipo" required>
+                                        <option value="">Seleccionar...</option>
+                                        <option value="entrada">Entrada</option>
+                                        <option value="salida">Salida</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Categoría</label>
+                                    <select class="form-select" id="editTransactionCategory" name="categoria" required>
+
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Monto Total</label>
+                                    <input type="number" class="form-control" id="editTransactionMonto" name="monto"
+                                        step="0.01" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Monto Ganancia</label>
+                                    <input type="number" class="form-control" id="editTransactionGanancia"
+                                        name="ganancia" step="0.01" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Descripción</label>
+                                    <textarea class="form-control" id="editTransactionDescripcion" name="descripcion"
+                                        rows="2" required></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Nota (opcional)</label>
+                                    <textarea class="form-control" id="editTransactionNota" name="nota"
+                                        rows="2"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Fecha</label>
+                                    <input type="date" class="form-control" id="editTransactionFecha" name="fecha"
+                                        required>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" id="editCamcelButton"
+                                    data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+
+            <!-- Modal para registrar un nuevo empeño después de un préstamo -->
+            <div class="modal fade" id="addEmpenioFromCashflowModal" tabindex="-1" aria-hidden="true"
+                data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form action="/empenio/guardar-empenio" method="POST" id="newEmpenioFromCashflowForm">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Registrar Nuevo Empeño</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="mb-3">
+                                    Se ha registrado una transacción de salida/préstamo. Para mantener la coherencia del
+                                    flujo de trabajo,
+                                    registre el empeño asociado.
+                                </p>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Nombres:</label>
+                                        <input type="text" class="form-control" name="nombres" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Apellidos:</label>
+                                        <input type="text" class="form-control" name="apellidos" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Artefacto:</label>
+                                        <input type="text" class="form-control" name="artefacto" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Marca:</label>
+                                        <input type="text" class="form-control" name="marca" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Fecha:</label>
+                                        <input type="date" class="form-control" name="fecha" id="newEmpenioFecha"
+                                            required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Monto:</label>
+                                        <input type="number" class="form-control" name="monto" id="newEmpenioMonto"
+                                            step="0.01" required>
+                                    </div>
+                                    <div class="col-12 mb-2">
+                                        <label class="form-label">Descripción:</label>
+                                        <textarea class="form-control" name="descripcion" rows="3"></textarea>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Propietario:</label>
+                                        <select class="form-select" name="propietario" required>
+                                            <option value="">Seleccione un propietario</option>
+                                            <option value="Tienda">Tienda</option>
+                                            <option value="Orlando">Orlando</option>
+                                            <option value="Oscar">Oscar</option>
+                                            <option value="Oliver">Oliver</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" class="btn btn-primary">Guardar Empeño</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Omitir</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal simple para ver nota de transacción -->
+            <div class="modal fade" id="noteModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Nota de la transacción</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p id="noteModalContent" class="mb-0"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Más contenido específico -->
+        </div>
+
+        <%- include('partials/footer') %>
+
+            <%- include('partials/scripts', {currentPage: 'cashflow' }) %>
+                <script>
+                    //const shouldOpenEmpenioModal = <%= nuevoEmpenio ? 'true' : 'false' %>;
+                    const shouldOpenEmpenioModal = "<%= nuevoEmpenio %>" === "true";
+                    console.log("shouldOpenEmpenioModal:", shouldOpenEmpenioModal);
+                    const defaultEmpenioMonto = "<%= montoEmpenio || '' %>";
+                    const defaultEmpenioFecha = "<%= fechaEmpenio || '' %>";
+                    // Scripts específicos para la página de flujo de caja
+                    document.addEventListener('DOMContentLoaded', function () {
+                        console.log('Página de flujo de caja cargada');
+                        loadCurrentMonthTransactions();
+                        if (shouldOpenEmpenioModal) {
+                            const modalEl = document.getElementById('addEmpenioFromCashflowModal');
+                            if (modalEl) {
+                                const fechaInput = document.getElementById('newEmpenioFecha');
+                                if (fechaInput && defaultEmpenioFecha) {
+                                    fechaInput.value = defaultEmpenioFecha;
+                                }
+                                const montoInput = document.getElementById('newEmpenioMonto');
+                                if (montoInput && defaultEmpenioMonto) {
+                                    montoInput.value = defaultEmpenioMonto;
+                                }
+                                const empModal = new bootstrap.Modal(modalEl);
+                                empModal.show();
+                            }
+                        }
+                    });
+                    console.log("funciona");
+                </script>
+                </body>
+
+                </html>

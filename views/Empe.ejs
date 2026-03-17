@@ -1,0 +1,821 @@
+<%- include('partials/header', {title: 'Flujo de Caja - Sistema de Empeños' , currentPage: 'empenio' }) %>
+
+    <%- include('partials/sidebar', {currentPage: 'empenio' }) %>
+
+        <div class="main-content">
+            <!-- Page Heading -->
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 text-gray-800">Empeños</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+                    <i class="fas fa-plus me-2"></i>Nuevo Empeño
+                </button>
+            </div>
+
+
+            <!-- Page Heading -->
+            <!--
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 text-gray-800">Empeños</h1>
+                <a id="" href="/empenio/nuevo-empenio">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+                        <i class="fas fa-plus me-2" ></i>Nuevo Empeño
+                    </button>
+                </a>
+            </div>
+            -->
+
+            <!-- Contenido específico de la página de flujo de caja -->
+            <div class="filters-container">
+                <h3>Filtros</h3>
+                <form action="/empenio" method="GET">
+                    <input type="text" name="nombres" placeholder="Buscar por nombre" value="<%= nombres || '' %>">
+                    <input type="text" name="apellidos" placeholder="Buscar por apellidos"
+                        value="<%= apellidos || '' %>">
+                    <input type="text" name="artefacto" placeholder="Buscar por artefacto"
+                        value="<%= artefacto || '' %>">
+                    <input type="text" name="marca" placeholder="Buscar por marca" value="<%= marca || '' %>">
+                    <input type="date" name="fecha" value="<%= fecha || '' %>">
+                    <input type="number" name="monto" placeholder="Buscar por monto" value="<%= monto || '' %>">
+                    <select name="propietario" id="propietario">
+                        <option value="<%= propietario || '' %>">
+                            <%= propietario || 'Propietario' %>
+                        </option>
+                    </select>
+
+                    <button type="submit">Buscar</button>
+                    <a href="/empenio"><button type="button">Limpiar</button></a><br>
+                </form>
+            </div>
+
+            <div class="total-section">
+                <button id="calcularTotal">Calcular total</button>
+                <div id="totalResultado">Total: S/0.00</div>
+            </div>
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 font-weight-bold text-primary">Lista de Empeños </h6>
+                        </div>
+                        <div class="card-body">
+                            <!-- Formulario de transacción -->
+                            <form>
+                                <!-- Campos del formulario -->
+
+                            </form>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombres</th>
+                                    <th>Apellidos</th>
+                                    <th>Artefacto</th>
+                                    <th>Marca</th>
+                                    <th>Fecha</th>
+                                    <th>Monto</th>
+                                    <th>Estado</th>
+                                    <th>Propietario</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% empenios.forEach(emp=> { %>
+                                    <tr>
+                                        <td>
+                                            <%= emp.idEmpenios %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Nombres_Cliente %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Apellidos_Cliente %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Artefacto %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Marca %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Fecha.toISOString().split('T')[0] %>
+                                        </td>
+                                        <td>S/<%= emp.Monto.toFixed(2) %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Estado %>
+                                        </td>
+                                        <td>
+                                            <%= emp.Propietario %>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="edit-btn" type="button"
+                                                    data-descripcion="<%= emp.Detalles || '' %>"
+                                                    data-id="<%= emp.idEmpenios %>">Editar</button>
+                                                <button type="button" class="interest-btn" data-id="<%= emp.idEmpenios %>">Interés</button>
+                                                <a href="/empenio/<%= emp.idEmpenios %>/detalle">
+                                                    <button class="details-btn">Detalles</button>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Más contenido específico -->
+        </div>
+        <!-- Add Transaction Modal -->
+        <div class="modal fade" id="addTransactionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+            data-bs-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form action="/empenio/guardar-empenio" method="POST">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Registrar Nuevo Empeño</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label>Nombres:</label>
+                            <input type="text" name="nombres" required><br>
+
+                            <label>Apellidos:</label>
+                            <input type="text" name="apellidos" required><br>
+
+                            <label>Artefacto:</label>
+                            <input type="text" name="artefacto" required><br>
+
+                            <label>Marca:</label>
+                            <input type="text" name="marca" required><br>
+
+                            <label>Fecha:</label>
+                            <input type="date" name="fecha" id="fecha" required><br>
+
+                            <label>Monto:</label>
+                            <input type="number" name="monto" required><br>
+
+                            <label>Descripcion:</label>
+                            <textarea name="descripcion" rows="5" cols="54"></textarea><br>
+
+                            <label>Propietario:</label>
+                            <select name="propietario" id="propietario" required>
+                                <option value="">Seleccione un propietario</option>
+                                <option value="Tienda">Tienda</option>
+                                <option value="Orlando">Orlando</option>
+                                <option value="Oscar">Oscar</option>
+                                <option value="Oliver">Oliver</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" id="guardar" class="btn btn-primary">Guardar</button>
+                            <button type="button" id="cancelar" class="btn btn-secondary"
+                                data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para editar empeño -->
+        <div class="modal fade" id="editEmpenioModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+            data-bs-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form id="editEmpenioForm" action="/empenio/actualizar-empenio/" method="POST">
+                        <input type="hidden" name="idEmpenios" id="edit_idEmpenios">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Editar Empeño</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label>Nombres:</label>
+                            <input type="text" class="form-control" name="nombres" id="edit_nombres" required>
+                            <label>Apellidos:</label>
+                            <input type="text" class="form-control" name="apellidos" id="edit_apellidos" required>
+                            <label>Artefacto:</label>
+                            <input type="text" class="form-control" name="artefacto" id="edit_artefacto" required>
+                            <label>Marca:</label>
+                            <input type="text" class="form-control" name="marca" id="edit_marca" required>
+                            <label>Fecha:</label>
+                            <input type="date" class="form-control" name="fecha" id="edit_fecha" required>
+                            <label>Monto:</label>
+                            <input type="number" class="form-control" name="monto" id="edit_monto" required>
+                            <label>Descripcion:</label>
+                            <textarea name="descripcion" class="form-control" id="edit_descripcion" rows="5"
+                                cols="54"></textarea>
+                            <label>Propietario:</label>
+                            <select class="form-select" name="propietario" id="edit_propietario" required>
+                                <option value="Tienda">Tienda</option>
+                                <option value="Orlando">Orlando</option>
+                                <option value="Oscar">Oscar</option>
+                                <option value="Oliver">Oliver</option>
+                            </select>
+                            <label>Estado:</label>
+                            <select class="form-select" name="estado" id="edit_estado" required>
+                                <option value="Activo">Activo</option>
+                                <option value="Recogido">Recogido</option>
+                                <option value="En venta">En venta</option>
+                                <option value="Vendido">Vendido</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal para ver detalles de empeño (solo lectura) -->
+        <div class="modal fade" id="detailsEmpenioModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Detalles del Empeño</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label>ID:</label>
+                                <input type="text" class="form-control" id="details_idEmpenios" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Nombres:</label>
+                                <input type="text" class="form-control" id="details_nombres" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Apellidos:</label>
+                                <input type="text" class="form-control" id="details_apellidos" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Artefacto:</label>
+                                <input type="text" class="form-control" id="details_artefacto" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Marca:</label>
+                                <input type="text" class="form-control" id="details_marca" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Fecha:</label>
+                                <input type="text" class="form-control" id="details_fecha" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Monto:</label>
+                                <input type="text" class="form-control" id="details_monto" readonly>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Estado:</label>
+                                <select class="form-select" id="details_estado" disabled>
+                                    <option value="Activo">Activo</option>
+                                    <option value="Recogido">Recogido</option>
+                                    <option value="En venta">En venta</option>
+                                    <option value="Vendido">Vendido</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Propietario:</label>
+                                <select class="form-select" id="details_propietario" disabled>
+                                    <option value="Tienda">Tienda</option>
+                                    <option value="Orlando">Orlando</option>
+                                    <option value="Oscar">Oscar</option>
+                                    <option value="Oliver">Oliver</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label>Descripción:</label>
+                            <textarea class="form-control" id="details_descripcion" rows="4" readonly></textarea>
+                        </div>
+                        <hr>
+                        <h5>Intereses Asociados</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Monto</th>
+                                        <th>Descripción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="details_intereses_body">
+                                    <!-- Filas de intereses cargadas dinámicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para gestionar intereses de un empeño -->
+        <div class="modal fade" id="interestEmpenioModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+            data-bs-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Intereses del Empeño</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6 mb-2"><strong>ID:</strong> <span id="interest_idEmpenios"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Fecha:</strong> <span id="interest_fecha"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Nombres:</strong> <span id="interest_nombres"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Apellidos:</strong> <span id="interest_apellidos"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Artefacto:</strong> <span id="interest_artefacto"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Marca:</strong> <span id="interest_marca"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Monto:</strong> <span id="interest_monto"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Propietario:</strong> <span id="interest_propietario"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Estado:</strong> <span id="interest_estado"></span></div>
+                        </div>
+                        <hr>
+                        <h5>Intereses Asociados</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Monto</th>
+                                        <th>Descripción</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="interest_intereses_body">
+                                    <!-- Filas de intereses cargadas dinámicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="btnOpenAddInterest" class="btn btn-primary">Agregar interés</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para editar un interés -->
+        <div class="modal fade" id="editInterestModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+            data-bs-keyboard="false">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form id="editInterestForm">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Editar Interés</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="edit_interest_fecha" class="form-label">Fecha</label>
+                                <input type="date" class="form-control" id="edit_interest_fecha" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_interest_monto" class="form-label">Monto</label>
+                                <input type="number" step="0.01" class="form-control" id="edit_interest_monto" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_interest_descripcion" class="form-label">Descripción</label>
+                                <textarea class="form-control" id="edit_interest_descripcion" rows="3" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para crear un nuevo interés -->
+        <div class="modal fade" id="addInterestModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+            data-bs-keyboard="false">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form id="addInterestForm">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Agregar Interés</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="add_interest_fecha" class="form-label">Fecha</label>
+                                <input type="date" class="form-control" id="add_interest_fecha" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="add_interest_monto" class="form-label">Monto</label>
+                                <input type="number" step="0.01" class="form-control" id="add_interest_monto" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="add_interest_descripcion" class="form-label">Descripción</label>
+                                <textarea class="form-control" id="add_interest_descripcion" rows="3" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary">Guardar</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <%- include('partials/footer') %>
+
+            <%- include('partials/scripts', {currentPage: 'empenio' }) %>
+                <script>
+
+
+                    // Actualiza la acción del formulario con el id seleccionado
+                    document.addEventListener('DOMContentLoaded', function () {
+                        document.querySelectorAll('.edit-btn').forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                var id = btn.getAttribute('data-id');
+                                document.getElementById('editEmpenioForm').action = '/empenio/actualizar-empenio/' + id;
+                            });
+                        });
+                    });
+                    // Scripts específicos para la página de flujo de caja
+                    document.addEventListener('DOMContentLoaded', function () { 
+                        
+                        console.log('Página de Empenios cargada');
+                        // Abrir modal de edición y rellenar datos
+                        document.querySelectorAll('.edit-btn').forEach(function (btn) {
+                            btn.addEventListener('click', function (e) {
+                                e.preventDefault();
+                                const tr = btn.closest('tr');
+                                console.log(tr);
+                                document.getElementById('edit_idEmpenios').value = tr.children[0].textContent.trim();
+                                document.getElementById('edit_nombres').value = tr.children[1].textContent.trim();
+                                document.getElementById('edit_apellidos').value = tr.children[2].textContent.trim();
+                                document.getElementById('edit_artefacto').value = tr.children[3].textContent.trim();
+                                document.getElementById('edit_marca').value = tr.children[4].textContent.trim();
+                                document.getElementById('edit_fecha').value = tr.children[5].textContent.trim();
+                                document.getElementById('edit_monto').value = tr.children[6].textContent.replace('S/', '').trim();
+                                document.getElementById('edit_estado').value = tr.children[7].textContent.trim();
+                                document.getElementById('edit_descripcion').value = btn.getAttribute('data-descripcion');
+                                document.getElementById('edit_propietario').value = tr.children[8].textContent.trim();
+                                var editModal = new bootstrap.Modal(document.getElementById('editEmpenioModal'));
+                                editModal.show();
+                            });
+                        });
+
+                        // Abrir modal de detalles (solo lectura)
+                        document.querySelectorAll('.details-btn').forEach(function (btn) {
+                            btn.addEventListener('click', async function (e) {
+                                e.preventDefault();
+                                const tr = btn.closest('tr');
+                                const id = tr.children[0].textContent.trim();
+
+                                try {
+                                    const response = await fetch(`/empenio/${id}/detalle`, {
+                                        headers: {
+                                            'Accept': 'application/json'
+                                        }
+                                    });
+
+                                    if (!response.ok) {
+                                        console.error('Error al obtener detalles del empeño');
+                                        return;
+                                    }
+
+                                    const data = await response.json();
+                                    const emp = data.empenio;
+                                    const intereses = data.intereses || [];
+
+                                    // Rellenar datos principales (solo lectura)
+                                    document.getElementById('details_idEmpenios').value = emp.idEmpenios;
+                                    document.getElementById('details_nombres').value = emp.Nombres_Cliente;
+                                    document.getElementById('details_apellidos').value = emp.Apellidos_Cliente;
+                                    document.getElementById('details_artefacto').value = emp.Artefacto;
+                                    document.getElementById('details_marca').value = emp.Marca;
+                                    document.getElementById('details_fecha').value = emp.Fecha;
+                                    document.getElementById('details_monto').value = `S/${Number(emp.Monto).toFixed(2)}`;
+                                    document.getElementById('details_estado').value = emp.Estado || '';
+                                    document.getElementById('details_propietario').value = emp.Propietario || '';
+                                    document.getElementById('details_descripcion').value = emp.Detalles || '';
+
+                                    // Rellenar tabla de intereses
+                                    const tbody = document.getElementById('details_intereses_body');
+                                    tbody.innerHTML = '';
+
+                                    if (intereses.length === 0) {
+                                        const row = document.createElement('tr');
+                                        const cell = document.createElement('td');
+                                        cell.colSpan = 3;
+                                        cell.textContent = 'No hay intereses asociados.';
+                                        row.appendChild(cell);
+                                        tbody.appendChild(row);
+                                    } else {
+                                        intereses.forEach(interes => {
+                                            const row = document.createElement('tr');
+
+                                            const fechaCell = document.createElement('td');
+                                            const fecha = interes.Fecha ? new Date(interes.Fecha) : null;
+                                            fechaCell.textContent = fecha ? fecha.toISOString().split('T')[0] : '';
+
+                                            const montoCell = document.createElement('td');
+                                            montoCell.textContent = Number(interes.Monto).toFixed(2);
+
+                                            const descCell = document.createElement('td');
+                                            descCell.textContent = interes.Descripcion || '';
+
+                                            row.appendChild(fechaCell);
+                                            row.appendChild(montoCell);
+                                            row.appendChild(descCell);
+                                            tbody.appendChild(row);
+                                        });
+                                    }
+
+                                    var detailsModal = new bootstrap.Modal(document.getElementById('detailsEmpenioModal'));
+                                    detailsModal.show();
+                                } catch (error) {
+                                    console.error('Error al cargar los detalles:', error);
+                                }
+                            });
+                        });
+
+                        // Modal de intereses (gestión de intereses por empeño)
+                        const interestModalEl = document.getElementById('interestEmpenioModal');
+                        let interestModal = interestModalEl ? new bootstrap.Modal(interestModalEl) : null;
+                        const addInterestModalEl = document.getElementById('addInterestModal');
+                        let addInterestModal = addInterestModalEl ? new bootstrap.Modal(addInterestModalEl) : null;
+                        let currentInterestEmpenioId = null;
+                        let originalInterestForEdit = null;
+
+                        async function cargarInteresesDeEmpenio(id) {
+                            try {
+                                const response = await fetch(`/empenio/${id}/detalle`, {
+                                    headers: {
+                                        'Accept': 'application/json'
+                                    }
+                                });
+
+                                if (!response.ok) {
+                                    console.error('Error al obtener detalles del empeño');
+                                    return;
+                                }
+
+                                const data = await response.json();
+                                const emp = data.empenio;
+                                const intereses = data.intereses || [];
+
+                                // Datos principales del empeño (doble columna, solo lectura)
+                                document.getElementById('interest_idEmpenios').textContent = emp.idEmpenios;
+                                document.getElementById('interest_nombres').textContent = emp.Nombres_Cliente;
+                                document.getElementById('interest_apellidos').textContent = emp.Apellidos_Cliente;
+                                document.getElementById('interest_artefacto').textContent = emp.Artefacto;
+                                document.getElementById('interest_marca').textContent = emp.Marca;
+                                document.getElementById('interest_fecha').textContent = emp.Fecha;
+                                document.getElementById('interest_monto').textContent = `S/${Number(emp.Monto).toFixed(2)}`;
+                                document.getElementById('interest_estado').textContent = emp.Estado || '';
+                                document.getElementById('interest_propietario').textContent = emp.Propietario || '';
+
+                                // Rellenar tabla de intereses con acciones
+                                const tbodyInterest = document.getElementById('interest_intereses_body');
+                                tbodyInterest.innerHTML = '';
+
+                                if (intereses.length === 0) {
+                                    const row = document.createElement('tr');
+                                    const cell = document.createElement('td');
+                                    cell.colSpan = 4;
+                                    cell.textContent = 'No hay intereses asociados.';
+                                    row.appendChild(cell);
+                                    tbodyInterest.appendChild(row);
+                                } else {
+                                    intereses.forEach(interes => {
+                                        const row = document.createElement('tr');
+
+                                        const fechaCell = document.createElement('td');
+                                        const fechaObj = interes.Fecha ? new Date(interes.Fecha) : null;
+                                        const fechaStr = fechaObj ? fechaObj.toISOString().split('T')[0] : '';
+                                        fechaCell.textContent = fechaStr;
+
+                                        const montoCell = document.createElement('td');
+                                        const montoStr = Number(interes.Monto).toFixed(2);
+                                        montoCell.textContent = montoStr;
+
+                                        const descCell = document.createElement('td');
+                                        const descStr = interes.Descripcion || '';
+                                        descCell.textContent = descStr;
+
+                                        const actionsCell = document.createElement('td');
+
+                                        const editBtn = document.createElement('button');
+                                        editBtn.type = 'button';
+                                        editBtn.className = 'btn btn-sm btn-secondary me-1 edit-interest-btn';
+                                        editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+
+                                        const deleteBtn = document.createElement('button');
+                                        deleteBtn.type = 'button';
+                                        deleteBtn.className = 'btn btn-sm btn-danger delete-interest-btn';
+                                        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+
+                                        editBtn.addEventListener('click', function () {
+                                            originalInterestForEdit = {
+                                                idEmpenio: emp.idEmpenios,
+                                                fecha: fechaStr,
+                                                monto: montoStr,
+                                                descripcion: descStr
+                                            };
+
+                                            document.getElementById('edit_interest_fecha').value = fechaStr;
+                                            document.getElementById('edit_interest_monto').value = interes.Monto;
+                                            document.getElementById('edit_interest_descripcion').value = descStr;
+
+                                            const editModalEl = document.getElementById('editInterestModal');
+                                            if (editModalEl) {
+                                                const editModal = new bootstrap.Modal(editModalEl);
+                                                editModal.show();
+                                            }
+                                        });
+
+                                        deleteBtn.addEventListener('click', async function () {
+                                            if (!confirm('¿Deseas eliminar este interés?')) return;
+
+                                            try {
+                                                const resp = await fetch(`/empenio/${emp.idEmpenios}/interes`, {
+                                                    method: 'DELETE',
+                                                    headers: {
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    body: JSON.stringify({
+                                                        fecha: fechaStr,
+                                                        monto: montoStr,
+                                                        descripcion: descStr
+                                                    })
+                                                });
+
+                                                if (!resp.ok) {
+                                                    alert('Error al eliminar el interés');
+                                                    return;
+                                                }
+
+                                                await cargarInteresesDeEmpenio(emp.idEmpenios);
+                                            } catch (err) {
+                                                console.error('Error al eliminar el interés:', err);
+                                                alert('Error al eliminar el interés');
+                                            }
+                                        });
+
+                                        actionsCell.appendChild(editBtn);
+                                        actionsCell.appendChild(deleteBtn);
+
+                                        row.appendChild(fechaCell);
+                                        row.appendChild(montoCell);
+                                        row.appendChild(descCell);
+                                        row.appendChild(actionsCell);
+
+                                        tbodyInterest.appendChild(row);
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error al cargar los intereses del empeño:', error);
+                            }
+                        }
+
+                        // Click en botón "Interés" para abrir el modal
+                        document.querySelectorAll('.interest-btn').forEach(function (btn) {
+                            btn.addEventListener('click', async function (e) {
+                                e.preventDefault();
+                                const tr = btn.closest('tr');
+                                const id = tr.children[0].textContent.trim();
+                                currentInterestEmpenioId = id;
+                                await cargarInteresesDeEmpenio(id);
+                                if (interestModal) {
+                                    interestModal.show();
+                                }
+                            });
+                        });
+
+                        // Abrir formulario para agregar nuevo interés
+                        const btnOpenAddInterest = document.getElementById('btnOpenAddInterest');
+                        if (btnOpenAddInterest && addInterestModal) {
+                            btnOpenAddInterest.addEventListener('click', function () {
+                                if (!currentInterestEmpenioId) {
+                                    alert('Primero selecciona un empeño.');
+                                    return;
+                                }
+
+                                // Fecha por defecto: hoy
+                                const today = new Date();
+                                const yyyy = today.getFullYear();
+                                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                                const dd = String(today.getDate()).padStart(2, '0');
+                                document.getElementById('add_interest_fecha').value = `${yyyy}-${mm}-${dd}`;
+
+                                document.getElementById('add_interest_monto').value = '';
+                                document.getElementById('add_interest_descripcion').value = '';
+
+                                addInterestModal.show();
+                            });
+                        }
+
+                        // Guardar cambios de un interés (modal de edición)
+                        const editInterestForm = document.getElementById('editInterestForm');
+                        if (editInterestForm) {
+                            editInterestForm.addEventListener('submit', async function (e) {
+                                e.preventDefault();
+
+                                if (!originalInterestForEdit || !currentInterestEmpenioId) {
+                                    return;
+                                }
+
+                                const nuevaFecha = document.getElementById('edit_interest_fecha').value;
+                                const nuevoMonto = document.getElementById('edit_interest_monto').value;
+                                const nuevaDescripcion = document.getElementById('edit_interest_descripcion').value;
+
+                                try {
+                                    const resp = await fetch(`/empenio/${currentInterestEmpenioId}/interes`, {
+                                        method: 'PUT',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            originalFecha: originalInterestForEdit.fecha,
+                                            originalMonto: originalInterestForEdit.monto,
+                                            originalDescripcion: originalInterestForEdit.descripcion,
+                                            fecha: nuevaFecha,
+                                            monto: nuevoMonto,
+                                            descripcion: nuevaDescripcion
+                                        })
+                                    });
+
+                                    if (!resp.ok) {
+                                        alert('Error al actualizar el interés');
+                                        return;
+                                    }
+
+                                    const editModalEl = document.getElementById('editInterestModal');
+                                    const modalInstance = bootstrap.Modal.getInstance(editModalEl);
+                                    if (modalInstance) {
+                                        modalInstance.hide();
+                                    }
+
+                                    await cargarInteresesDeEmpenio(currentInterestEmpenioId);
+                                } catch (error) {
+                                    console.error('Error al actualizar el interés:', error);
+                                    alert('Error al actualizar el interés');
+                                }
+                            });
+                        }
+
+                        // Crear nuevo interés (modal de agregar)
+                        const addInterestForm = document.getElementById('addInterestForm');
+                        if (addInterestForm) {
+                            addInterestForm.addEventListener('submit', async function (e) {
+                                e.preventDefault();
+
+                                if (!currentInterestEmpenioId) {
+                                    alert('No se encontró el empeño actual.');
+                                    return;
+                                }
+
+                                const fecha = document.getElementById('add_interest_fecha').value;
+                                const monto = document.getElementById('add_interest_monto').value;
+                                const descripcion = document.getElementById('add_interest_descripcion').value;
+
+                                try {
+                                    const resp = await fetch(`/empenio/${currentInterestEmpenioId}/interes`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({ fecha, monto, descripcion })
+                                    });
+
+                                    if (!resp.ok) {
+                                        alert('Error al agregar el interés');
+                                        return;
+                                    }
+
+                                    if (addInterestModal) {
+                                        const modalInstance = bootstrap.Modal.getInstance(addInterestModalEl);
+                                        if (modalInstance) {
+                                            modalInstance.hide();
+                                        }
+                                    }
+
+                                    await cargarInteresesDeEmpenio(currentInterestEmpenioId);
+                                } catch (error) {
+                                    console.error('Error al agregar el interés:', error);
+                                    alert('Error al agregar el interés');
+                                }
+                            });
+                        }
+                    });
+                </script>
+                </body>
+
+                </html>

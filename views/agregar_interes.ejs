@@ -1,0 +1,60 @@
+<%- include('partials/header', {title: 'Flujo de Caja - Sistema de Empeños', currentPage: 'interests'}) %>
+
+<%- include('partials/sidebar', {currentPage: 'interests'}) %>
+<div class="main-content">
+    <h2>Detalles del Empeño</h2>
+
+    <ul>
+        <li><strong>Nombres:</strong> <%= empenio.Nombres_Cliente %></li>
+        <li><strong>Apellidos:</strong> <%= empenio.Apellidos_Cliente %></li>
+        <li><strong>Artefacto:</strong> <%= empenio.Artefacto %></li>
+        <li><strong>Marca:</strong> <%= empenio.Marca %></li>
+        <li><strong>Fecha:</strong> <%= empenio.Fecha %></li>
+        <li><strong>Monto:</strong> <%= empenio.Monto %></li>
+        <li><strong>Propietario:</strong> <%= empenio.Propietario %></li>
+    </ul>
+    <h3>Agregar Interés</h3>
+    <form action="/empenio/<%= empenio.idEmpenios %>/interes" method="POST">
+        <label for="fecha">Fecha:</label>
+        <input type="date" name="fecha" id="fecha" required>
+        <label for="monto">Monto:</label>
+        <input type="number" name="monto" placeholder="Monto de Interés" required>
+        <label for="descripcion">Descripción:</label>
+        <input type="text" name="descripcion" placeholder="Descripción del Interés" required>
+        <button type="submit" id="guardar">Guardar</button>
+        <a href="/empenio"><button type="button" id="cancelar">Cancelar</button></a>
+    </form>
+</div>
+    <%- include('partials/footer') %>
+    
+<%- include('partials/scripts', {currentPage: 'cashflow'}) %>
+    <script>
+        // Scripts específicos para la página de flujo de caja
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Página de flujo de caja cargada');
+            // Aquí tu código JavaScript específico para esta página
+        });
+        console.log("funciona");
+    </script>
+</body>
+</html>
+
+<!--comentario en html 
+
+    <script>
+        // Obtiene la fecha actual
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0'); // Mes en formato 2 dígitos
+        const dd = String(today.getDate()).padStart(2, '0'); // Día en formato 2 dígitos
+
+        // Formato: yyyy-mm-dd
+        const formattedDate = `${yyyy}-${mm}-${dd}`;
+
+        // Establece el valor por defecto del campo de fecha
+        document.getElementById("fecha").value = formattedDate;
+    </script>
+
+</body>
+</html>
+-->

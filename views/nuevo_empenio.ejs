@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear nuevo Empeño</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        form { max-width: 400px; margin: auto; }
+        label { font-weight: bold; display: block; margin-top: 10px; }
+        input, select { width: 100%; padding: 8px; margin-top: 5px; }
+        #guardar {
+            background-color: #4CAF50; 
+            color: white; 
+            padding: 10px; 
+            margin-top: 15px; 
+            border: none; 
+            cursor: pointer; 
+            width: 100%; 
+        }
+        #cancelar {
+            background-color: red; 
+            color: white; 
+            padding: 10px; 
+            margin-top: 15px; 
+            border: none; 
+            cursor: pointer; 
+            width: 100%; 
+        }
+        button:hover { background-color: #45a049; }
+    </style>
+</head>
+<body>
+
+    <h1>Crear nuevo Empeño</h1>
+    
+    <form action="/empenio/guardar-empenio" method="POST">
+        <label>Nombres:</label>
+        <input type="text" name="nombres" required>
+    
+        <label>Apellidos:</label>
+        <input type="text" name="apellidos" required>
+    
+        <label>Artefacto:</label>
+        <input type="text" name="artefacto" required>
+    
+        <label>Marca:</label>
+        <input type="text" name="marca" required>
+    
+        <label>Fecha:</label>
+        <input type="date" name="fecha" id="fecha" required>
+    
+        <label>Monto:</label>
+        <input type="number" name="monto" required>
+
+        <label>Descripcion:</label>
+        <textarea name="descripcion"rows="5" cols="54"></textarea>
+    
+        <label>Propietario:</label>
+        <select name="propietario" id="propietario" required>
+            <option value="">Seleccione un propietario</option>
+            <option value="Tienda">Tienda</option>
+            <option value="Orlando">Orlando</option>
+            <option value="Oscar">Oscar</option>
+            <option value="Oliver">Oliver</option>
+        </select>
+    
+        <button type="submit" id="guardar">Guardar</button>
+        <a href="/empenio"><button type="button" id="cancelar">Cancelar</button></a>
+    </form>
+    <script>
+        // Obtiene la fecha actual
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0'); // Mes en formato 2 dígitos
+        const dd = String(today.getDate()).padStart(2, '0'); // Día en formato 2 dígitos
+
+        // Formato: yyyy-mm-dd
+        const formattedDate = `${yyyy}-${mm}-${dd}`;
+
+        // Establece el valor por defecto del campo de fecha
+        document.getElementById("fecha").value = formattedDate;
+    </script>
+
+</body>
+
+</html>

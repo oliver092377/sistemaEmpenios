@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title || 'Sistema de Empeños' %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4e73df;
+            --secondary: #858796;
+            --success: #1cc88a;
+            --info: #36b9cc;
+            --warning: #f6c23e;
+            --danger: #e74a3b;
+            --light: #f8f9fc;
+            --dark: #5a5c69;
+        }
+        
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: 0 0 45px 0 rgba(0, 0, 0, 0.12);
+            background: linear-gradient(180deg, var(--primary) 10%, #224abe 100%);
+            width: 250px;
+            transition: margin-left 0.3s ease;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: margin-left 0.3s ease, padding-left 0.3s ease;
+        }
+
+        body.sidebar-collapsed .sidebar {
+            margin-left: -250px;
+        }
+
+        body.sidebar-collapsed .main-content {
+            margin-left: 0;
+            padding-left: 60px; /* espacio para el botón hamburguesa */
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 101;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+        .sidebar-brand {
+            font-weight: 800;
+            font-size: 1.5rem;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            color: #fff;
+            text-decoration: none;
+            display: block;
+        }
+        
+        .sidebar-divider {
+            border-top: 1px solid rgba(255,255,255,.15);
+            margin: 0 1rem 1rem;
+        }
+        
+        .nav-item {
+            position: relative;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,.8);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        
+        .nav-link i {
+            margin-right: 0.5rem;
+            font-size: 1.2rem;
+        }
+        
+        .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255,255,255,.1);
+        }
+        
+        .active {
+            color: #fff !important;
+            background-color: rgba(255,255,255,.1);
+        }
+        
+        .card {
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            border: none;
+            border-radius: 0.35rem;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background-color: #f8f9fc;
+            border-bottom: 1px solid #e3e6f0;
+            padding: 0.75rem 1.25rem;
+        }
+        
+        .dashboard-card {
+            border-left: 0.25rem solid;
+        }
+        
+        .bg-primary-card {
+            border-left-color: var(--primary);
+        }
+        
+        .bg-success-card {
+            border-left-color: var(--success);
+        }
+        
+        .bg-info-card {
+            border-left-color: var(--info);
+        }
+        
+        .bg-warning-card {
+            border-left-color: var(--warning);
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: #2e59d9;
+            border-color: #2653d4;
+        }
+        
+        .btn-success {
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger);
+            border-color: var(--danger);
+        }
+        
+        .transaction-table th {
+            background-color: #f8f9fc;
+            color: var(--dark);
+            font-weight: 700;
+        }
+        
+        .income {
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .expense {
+            color: var(--danger);
+            font-weight: bold;
+        }
+        
+        .capital {
+            color: var(--info);
+            font-weight: bold;
+        }
+        
+        .profit {
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        /* Estilos adicionales según sea necesario */
+    </style>
+</head>
