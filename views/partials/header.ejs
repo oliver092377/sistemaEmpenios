@@ -194,6 +194,109 @@
             font-size: 1.5rem;
             font-weight: 700;
         }
+
+        /* Action buttons styling */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .action-buttons button, .action-buttons a {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .action-buttons a {
+            text-decoration: none;
+        }
+
+        .action-buttons a button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .action-buttons .edit-btn {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .action-buttons .edit-btn:hover {
+            background-color: #1976D2;
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        .action-buttons .interest-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .action-buttons .interest-btn:hover {
+            background-color: #F57C00;
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+        }
+
+        .action-buttons .details-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .action-buttons .details-btn:hover {
+            background-color: #388E3C;
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .action-buttons button:disabled {
+            background-color: #CCCCCC;
+            cursor: not-allowed;
+            opacity: 0.6;
+            color: #666;
+        }
+
+        .action-buttons button:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Checkbox styling */
+        .form-check {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fc;
+            border-radius: 4px;
+            border-left: 3px solid #2196F3;
+        }
+
+        .form-check-input:checked {
+            background-color: #2196F3;
+            border-color: #2196F3;
+        }
+
+        .form-check-label {
+            margin-left: 8px;
+            font-weight: 500;
+        }
+
         /* Estilos adicionales según sea necesario */
     </style>
 </head>

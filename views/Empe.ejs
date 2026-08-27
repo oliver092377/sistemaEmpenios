@@ -6,130 +6,142 @@
             <!-- Page Heading -->
 
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 text-gray-800">Empeños</h1>
+                <div>
+                    <h1 class="h3 text-gray-800">Empeños</h1>
+                    <% if(showAll) { %>
+                        <small class="text-muted">Mostrando empeños de todas las empresas</small>
+                        <% } %>
+                </div>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
                     <i class="fas fa-plus me-2"></i>Nuevo Empeño
                 </button>
             </div>
 
-
-            <!-- Page Heading -->
-            <!--
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 text-gray-800">Empeños</h1>
-                <a id="" href="/empenio/nuevo-empenio">
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-                        <i class="fas fa-plus me-2" ></i>Nuevo Empeño
-                    </button>
-                </a>
-            </div>
-            -->
-
-            <!-- Contenido específico de la página de flujo de caja -->
-            <div class="filters-container">
-                <h3>Filtros</h3>
-                <form action="/empenio" method="GET">
-                    <input type="text" name="nombres" placeholder="Buscar por nombre" value="<%= nombres || '' %>">
-                    <input type="text" name="apellidos" placeholder="Buscar por apellidos"
-                        value="<%= apellidos || '' %>">
-                    <input type="text" name="artefacto" placeholder="Buscar por artefacto"
-                        value="<%= artefacto || '' %>">
-                    <input type="text" name="marca" placeholder="Buscar por marca" value="<%= marca || '' %>">
-                    <input type="date" name="fecha" value="<%= fecha || '' %>">
-                    <input type="number" name="monto" placeholder="Buscar por monto" value="<%= monto || '' %>">
-                    <select name="propietario" id="propietario">
-                        <option value="<%= propietario || '' %>">
-                            <%= propietario || 'Propietario' %>
-                        </option>
-                    </select>
-
-                    <button type="submit">Buscar</button>
-                    <a href="/empenio"><button type="button">Limpiar</button></a><br>
-                </form>
-            </div>
-
-            <div class="total-section">
-                <button id="calcularTotal">Calcular total</button>
-                <div id="totalResultado">Total: S/0.00</div>
-            </div>
-            <div class="row">
-                <div class="col-lg-12">
-                    <div class="card shadow mb-4">
-                        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                            <h6 class="m-0 font-weight-bold text-primary">Lista de Empeños </h6>
-                        </div>
-                        <div class="card-body">
-                            <!-- Formulario de transacción -->
-                            <form>
-                                <!-- Campos del formulario -->
-
-                            </form>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Nombres</th>
-                                    <th>Apellidos</th>
-                                    <th>Artefacto</th>
-                                    <th>Marca</th>
-                                    <th>Fecha</th>
-                                    <th>Monto</th>
-                                    <th>Estado</th>
-                                    <th>Propietario</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <% empenios.forEach(emp=> { %>
-                                    <tr>
-                                        <td>
-                                            <%= emp.idEmpenios %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Nombres_Cliente %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Apellidos_Cliente %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Artefacto %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Marca %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Fecha.toISOString().split('T')[0] %>
-                                        </td>
-                                        <td>S/<%= emp.Monto.toFixed(2) %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Estado %>
-                                        </td>
-                                        <td>
-                                            <%= emp.Propietario %>
-                                        </td>
-                                        <td>
-                                            <div class="action-buttons">
-                                                <button class="edit-btn" type="button"
-                                                    data-descripcion="<%= emp.Detalles || '' %>"
-                                                    data-id="<%= emp.idEmpenios %>">Editar</button>
-                                                <button type="button" class="interest-btn" data-id="<%= emp.idEmpenios %>">Interés</button>
-                                                <a href="/empenio/<%= emp.idEmpenios %>/detalle">
-                                                    <button class="details-btn">Detalles</button>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <% }); %>
-                            </tbody>
-                        </table>
-
+            <% if(user && user.isAdminUser) { %>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showAllEmpenios" <% if(showAll) { %>checked
+                        <% } %>>
+                            <label class="form-check-label" for="showAllEmpenios">
+                                Mostrar todos los empeños
+                            </label>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Más contenido específico -->
+                <% } %>
+
+                    <!-- Contenido específico de la página de flujo de caja -->
+                    <div class="filters-container">
+                        <h3>Filtros</h3>
+                        <form action="/empenio" method="GET" id="filterForm">
+                            <input type="text" name="nombres" placeholder="Buscar por nombre"
+                                value="<%= nombres || '' %>">
+                            <input type="text" name="apellidos" placeholder="Buscar por apellidos"
+                                value="<%= apellidos || '' %>">
+                            <input type="text" name="artefacto" placeholder="Buscar por artefacto"
+                                value="<%= artefacto || '' %>">
+                            <input type="text" name="marca" placeholder="Buscar por marca" value="<%= marca || '' %>">
+                            <input type="date" name="fecha" value="<%= fecha || '' %>">
+                            <input type="number" name="monto" placeholder="Buscar por monto" value="<%= monto || '' %>">
+                            <input type="hidden" id="showAllInput" name="showAll" value="">
+
+                            <button type="submit">Buscar</button>
+                            <a href="/empenio"><button type="button">Limpiar</button></a><br>
+                        </form>
+                    </div>
+
+                    <div class="total-section">
+                        <button id="calcularTotal">Calcular total</button>
+                        <div id="totalResultado">Total: S/0.00</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                    <h6 class="m-0 font-weight-bold text-primary">Lista de Empeños </h6>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Formulario de transacción -->
+                                    <form>
+                                        <!-- Campos del formulario -->
+
+                                    </form>
+                                </div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Nombres</th>
+                                            <th>Apellidos</th>
+                                            <th>Artefacto</th>
+                                            <th>Marca</th>
+                                            <th>Fecha</th>
+                                            <th>Monto</th>
+                                            <th>Estado</th>
+                                            <th>EmpresaXD</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% empenios.forEach(emp=> { %>
+                                            <tr>
+                                                <td>
+                                                    <%= emp.idEmpenios %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.Nombres_Cliente %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.Apellidos_Cliente %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.Artefacto %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.Marca %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.Fecha.toISOString().split('T')[0] %>
+                                                </td>
+                                                <td>S/<%= emp.Monto.toFixed(2) %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.Estado %>
+                                                </td>
+                                                <td>
+                                                    <%= emp.empresaNombre || 'Sin empresa' %>
+                                                </td>
+                                                <td>
+                                                    <div class="action-buttons">
+                                                        <% if(user && user.isAdminUser) { %>
+
+                                                            <% if(emp.empresaId===currentEmpresaId) { %>
+                                                                <button class="edit-btn" type="button"
+                                                                    data-descripcion="<%= emp.Detalles || '' %>"
+                                                                    data-id="<%= emp.idEmpenios %>">
+                                                                    <i class="fas fa-edit"></i> Editar
+                                                                </button>
+                                                                <button type="button" class="interest-btn"
+                                                                    data-id="<%= emp.idEmpenios %>">
+                                                                    <i class="fas fa-dollar-sign"></i> Interés
+                                                                </button>
+                                                                <% } %>
+                                                                    <% } %>
+                                                                        <button class="details-btn" type="button"
+                                                                            data-id="<%= emp.idEmpenios %>">
+                                                                            <i class="fas fa-eye"></i> Detalles
+                                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <% }); %>
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Más contenido específico -->
         </div>
         <!-- Add Transaction Modal -->
         <div class="modal fade" id="addTransactionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
@@ -163,14 +175,6 @@
                             <label>Descripcion:</label>
                             <textarea name="descripcion" rows="5" cols="54"></textarea><br>
 
-                            <label>Propietario:</label>
-                            <select name="propietario" id="propietario" required>
-                                <option value="">Seleccione un propietario</option>
-                                <option value="Tienda">Tienda</option>
-                                <option value="Orlando">Orlando</option>
-                                <option value="Oscar">Oscar</option>
-                                <option value="Oliver">Oliver</option>
-                            </select>
                         </div>
                         <div class="modal-footer">
                             <button type="submit" id="guardar" class="btn btn-primary">Guardar</button>
@@ -209,19 +213,14 @@
                             <label>Descripcion:</label>
                             <textarea name="descripcion" class="form-control" id="edit_descripcion" rows="5"
                                 cols="54"></textarea>
-                            <label>Propietario:</label>
-                            <select class="form-select" name="propietario" id="edit_propietario" required>
-                                <option value="Tienda">Tienda</option>
-                                <option value="Orlando">Orlando</option>
-                                <option value="Oscar">Oscar</option>
-                                <option value="Oliver">Oliver</option>
-                            </select>
                             <label>Estado:</label>
                             <select class="form-select" name="estado" id="edit_estado" required>
                                 <option value="Activo">Activo</option>
                                 <option value="Recogido">Recogido</option>
                                 <option value="En venta">En venta</option>
                                 <option value="Vendido">Vendido</option>
+                                <option value="Finalizado">Finalizado</option>
+                                <option value="Anulado">Anulado</option>
                             </select>
                         </div>
                         <div class="modal-footer">
@@ -232,7 +231,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Modal para ver detalles de empeño (solo lectura) -->
         <div class="modal fade" id="detailsEmpenioModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg">
@@ -278,16 +277,13 @@
                                     <option value="Recogido">Recogido</option>
                                     <option value="En venta">En venta</option>
                                     <option value="Vendido">Vendido</option>
+                                    <option value="Finalizado">Finalizado</option>
+                                    <option value="Anulado">Anulado</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-2">
-                                <label>Propietario:</label>
-                                <select class="form-select" id="details_propietario" disabled>
-                                    <option value="Tienda">Tienda</option>
-                                    <option value="Orlando">Orlando</option>
-                                    <option value="Oscar">Oscar</option>
-                                    <option value="Oliver">Oliver</option>
-                                </select>
+                                <label>Empresa:</label>
+                                <input type="text" class="form-control" id="details_empresa" readonly>
                             </div>
                         </div>
                         <div class="mb-3 mt-3">
@@ -331,12 +327,16 @@
                         <div class="row mb-3">
                             <div class="col-md-6 mb-2"><strong>ID:</strong> <span id="interest_idEmpenios"></span></div>
                             <div class="col-md-6 mb-2"><strong>Fecha:</strong> <span id="interest_fecha"></span></div>
-                            <div class="col-md-6 mb-2"><strong>Nombres:</strong> <span id="interest_nombres"></span></div>
-                            <div class="col-md-6 mb-2"><strong>Apellidos:</strong> <span id="interest_apellidos"></span></div>
-                            <div class="col-md-6 mb-2"><strong>Artefacto:</strong> <span id="interest_artefacto"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Nombres:</strong> <span id="interest_nombres"></span>
+                            </div>
+                            <div class="col-md-6 mb-2"><strong>Apellidos:</strong> <span id="interest_apellidos"></span>
+                            </div>
+                            <div class="col-md-6 mb-2"><strong>Artefacto:</strong> <span id="interest_artefacto"></span>
+                            </div>
                             <div class="col-md-6 mb-2"><strong>Marca:</strong> <span id="interest_marca"></span></div>
                             <div class="col-md-6 mb-2"><strong>Monto:</strong> <span id="interest_monto"></span></div>
-                            <div class="col-md-6 mb-2"><strong>Propietario:</strong> <span id="interest_propietario"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Empresa:</strong> <span id="interest_empresa"></span>
+                            </div>
                             <div class="col-md-6 mb-2"><strong>Estado:</strong> <span id="interest_estado"></span></div>
                         </div>
                         <hr>
@@ -386,7 +386,8 @@
                             </div>
                             <div class="mb-3">
                                 <label for="edit_interest_descripcion" class="form-label">Descripción</label>
-                                <textarea class="form-control" id="edit_interest_descripcion" rows="3" required></textarea>
+                                <textarea class="form-control" id="edit_interest_descripcion" rows="3"
+                                    required></textarea>
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -419,7 +420,8 @@
                             </div>
                             <div class="mb-3">
                                 <label for="add_interest_descripcion" class="form-label">Descripción</label>
-                                <textarea class="form-control" id="add_interest_descripcion" rows="3" required></textarea>
+                                <textarea class="form-control" id="add_interest_descripcion" rows="3"
+                                    required></textarea>
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -435,7 +437,22 @@
 
             <%- include('partials/scripts', {currentPage: 'empenio' }) %>
                 <script>
+                    // Handle showAll checkbox
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const showAllCheckbox = document.getElementById('showAllEmpenios');
+                        const filterForm = document.getElementById('filterForm');
+                        const showAllInput = document.getElementById('showAllInput');
 
+                        if (showAllCheckbox) {
+                            showAllCheckbox.addEventListener('change', function () {
+                                if (this.checked) {
+                                    showAllInput.value = '1';
+                                } else {
+                                    showAllInput.value = '';
+                                }
+                            });
+                        }
+                    });
 
                     // Actualiza la acción del formulario con el id seleccionado
                     document.addEventListener('DOMContentLoaded', function () {
@@ -447,8 +464,8 @@
                         });
                     });
                     // Scripts específicos para la página de flujo de caja
-                    document.addEventListener('DOMContentLoaded', function () { 
-                        
+                    document.addEventListener('DOMContentLoaded', function () {
+
                         console.log('Página de Empenios cargada');
                         // Abrir modal de edición y rellenar datos
                         document.querySelectorAll('.edit-btn').forEach(function (btn) {
@@ -465,7 +482,6 @@
                                 document.getElementById('edit_monto').value = tr.children[6].textContent.replace('S/', '').trim();
                                 document.getElementById('edit_estado').value = tr.children[7].textContent.trim();
                                 document.getElementById('edit_descripcion').value = btn.getAttribute('data-descripcion');
-                                document.getElementById('edit_propietario').value = tr.children[8].textContent.trim();
                                 var editModal = new bootstrap.Modal(document.getElementById('editEmpenioModal'));
                                 editModal.show();
                             });
@@ -475,8 +491,9 @@
                         document.querySelectorAll('.details-btn').forEach(function (btn) {
                             btn.addEventListener('click', async function (e) {
                                 e.preventDefault();
-                                const tr = btn.closest('tr');
-                                const id = tr.children[0].textContent.trim();
+                                const id = this.dataset.id;
+                                //const tr = btn.closest('tr');
+                                //const id = tr.children[0].textContent.trim();
 
                                 try {
                                     const response = await fetch(`/empenio/${id}/detalle`, {
@@ -503,7 +520,7 @@
                                     document.getElementById('details_fecha').value = emp.Fecha;
                                     document.getElementById('details_monto').value = `S/${Number(emp.Monto).toFixed(2)}`;
                                     document.getElementById('details_estado').value = emp.Estado || '';
-                                    document.getElementById('details_propietario').value = emp.Propietario || '';
+                                    document.getElementById('details_empresa').value = emp.empresaNombre || '';
                                     document.getElementById('details_descripcion').value = emp.Detalles || '';
 
                                     // Rellenar tabla de intereses
@@ -580,7 +597,7 @@
                                 document.getElementById('interest_fecha').textContent = emp.Fecha;
                                 document.getElementById('interest_monto').textContent = `S/${Number(emp.Monto).toFixed(2)}`;
                                 document.getElementById('interest_estado').textContent = emp.Estado || '';
-                                document.getElementById('interest_propietario').textContent = emp.Propietario || '';
+                                document.getElementById('interest_empresa').textContent = emp.empresaNombre || '';
 
                                 // Rellenar tabla de intereses con acciones
                                 const tbodyInterest = document.getElementById('interest_intereses_body');

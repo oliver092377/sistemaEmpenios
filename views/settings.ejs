@@ -34,6 +34,12 @@
                                 <small class="text-muted">Se usa únicamente si aún no existe un cierre anterior.</small>
                             </div>
                             <div class="col-12">
+                                <label class="form-label">Fecha de inicio de uso del sistema</label>
+                                <input type="date" class="form-control" name="fecha_inicio_sistema"
+                                    value="<%= config.fecha_inicio_sistema ? (config.fecha_inicio_sistema instanceof Date ? config.fecha_inicio_sistema.toISOString().split('T')[0] : config.fecha_inicio_sistema) : '' %>">
+                                <small class="text-muted">Fecha a partir de la cual el sistema tiene registrado los empeños. Se muestra como referencia al crear transacciones sin empeño asociado.</small>
+                            </div>
+                            <div class="col-12">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="cierreAutorizadoSwitch"
                                         name="cierre_autorizado" value="1" <%= config.cierre_autorizado ? 'checked' : '' %>>

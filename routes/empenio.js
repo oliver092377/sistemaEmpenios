@@ -1,17 +1,53 @@
-// routes/cashflow.js
+// routes/empenio.js
 import express from 'express';
-import mysql from 'mysql2/promise';
+import { pool } from '../db.js';
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  port: 3306,
-  password: '1234',
-  database: 'mydb',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+let transaccionesLossColumnReady = null;
+
+async function ensureTransaccionesLossColumn() {
+  if (!transaccionesLossColumnReady) {
+    transaccionesLossColumnReady = (async () => {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS total
+           FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'transacciones'
+            AND COLUMN_NAME = 'monto_perdida'`
+      );
+
+      if (!rows[0]?.total) {
+        await pool.query(
+          'ALTER TABLE transacciones ADD COLUMN monto_perdida DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER monto_ganancia'
+        );
+      }
+    })();
+  }
+
+  return transaccionesLossColumnReady;
+}
+
+let transaccionesEstadoReady = null;
+
+async function ensureTransaccionesEstadoColumn() {
+  if (!transaccionesEstadoReady) {
+    transaccionesEstadoReady = (async () => {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS total
+           FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'transacciones'
+            AND COLUMN_NAME = 'estado'`
+      );
+      if (!rows[0]?.total) {
+        await pool.query(
+          "ALTER TABLE transacciones ADD COLUMN estado ENUM('activa','anulada') NOT NULL DEFAULT 'activa' AFTER id_empenio"
+        );
+      }
+    })();
+  }
+  return transaccionesEstadoReady;
+}
+
 const app = express();
 
 app.use(express.urlencoded({ extended: true })); // Para datos de formularios
@@ -52,82 +88,88 @@ app.get('/buscar', async (req, res) => {
 
 // Listar transacciones
 app.get('/', async (req, res) => {
-  const { nombres, apellidos, artefacto, marca, fecha, monto, propietario } = req.query;
+  const { nombres, apellidos, artefacto, marca, fecha, monto, showAll } = req.query;
 
-  let query = 'SELECT * FROM Empenios WHERE 1=1';
+  // Only allow showAll for admin users
+  const allowShowAll = showAll === '1' && req.session.user.isAdminUser;
+
+  let query = `SELECT emp.*, e.nombre AS empresaNombre
+                 FROM Empenios emp
+            LEFT JOIN empresa e ON e.id = emp.empresaId
+                WHERE 1=1`;
   let params = [];
 
+  // Filter by empresa (unless admin and requesting showAll)
+  if (!allowShowAll) {
+    query += ' AND emp.empresaId = ?';
+    params.push(req.session.user.empresaId);
+  }
+
+  // Non-admin users don't see anulated empeños
+  if (!req.session.user.isAdminUser) {
+    query += " AND LOWER(emp.Estado) != 'anulado'";
+  }
+
   if (nombres) {
-    query += ' AND Nombres_Cliente LIKE ?';
+    query += ' AND emp.Nombres_Cliente LIKE ?';
     params.push(`%${nombres}%`);
   }
   if (apellidos) {
-    query += ' AND Apellidos_Cliente LIKE ?';
+    query += ' AND emp.Apellidos_Cliente LIKE ?';
     params.push(`%${apellidos}%`);
   }
   if (artefacto) {
-    query += ' AND Artefacto LIKE ?';
+    query += ' AND emp.Artefacto LIKE ?';
     params.push(`%${artefacto}%`);
   }
   if (marca) {
-    query += ' AND Marca LIKE ?';
+    query += ' AND emp.Marca LIKE ?';
     params.push(`%${marca}%`);
   }
   if (fecha) {
-    query += ' AND Fecha = ?';
+    query += ' AND emp.Fecha = ?';
     params.push(fecha);
   }
   if (monto) {
-    query += ' AND Monto = ?';
+    query += ' AND emp.Monto = ?';
     params.push(monto);
-  }
-  if (propietario) {
-    query += ' AND Propietario LIKE ?';
-    params.push(`%${propietario}%`);
   }
 
   try {
-    query += ' ORDER BY idEmpenios DESC';
+    query += ' ORDER BY emp.idEmpenios DESC';
     const [rows] = await pool.execute(query, params);
-    res.render('Empe.ejs', { empenios: rows, nombres, apellidos, artefacto, marca, fecha, monto, propietario, str: "" });
+    res.render('Empe.ejs', {
+      empenios: rows,
+      nombres,
+      apellidos,
+      artefacto,
+      marca,
+      fecha,
+      monto,
+      currentEmpresaId: req.session.user.empresaId,
+      showAll: allowShowAll,
+      str: ""
+    });
   } catch (error) {
     console.error('Error al obtener los empeños:', error);
     res.status(500).send('Error al obtener los datos');
   }
 });
 
-
-app.get('/nuevo-empenio', (req, res) => {
-  res.render('nuevo_empenio');
-});
-
-app.get('/editar-empenio/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [rows] = await pool.query('SELECT * FROM Empenios WHERE idEmpenios = ?', [id]);
-    if (rows.length === 0) {
-      return res.status(404).send('Empeño no encontrado');
-    }
-    let empenio = rows[0];
-    empenio.Fecha = empenio.Fecha.toISOString().split('T')[0];
-    res.render('editar_empenio', { empenio: rows[0] });
-  } catch (error) {
-    console.error('Error al obtener el empeño:', error);
-    res.status(500).send('Error al cargar la página de edición');
-  }
-});
 app.post('/actualizar-empenio/:id', async (req, res) => {
   const { id } = req.params;
-  console.log(id)
-  const { nombres, apellidos, artefacto, marca, fecha, monto, propietario, descripcion, estado } = req.body;
-  console.log("estado: ", estado)
+  const { nombres, apellidos, artefacto, marca, fecha, monto, descripcion, estado } = req.body;
   try {
-    await pool.query(
-      'UPDATE Empenios SET Nombres_Cliente = ?, Apellidos_Cliente = ?, Artefacto = ?, Marca = ?, Fecha = ?, Monto = ?, Propietario = ?, Detalles=?, Estado=? WHERE idEmpenios = ?',
-      [nombres, apellidos, artefacto, marca, fecha, monto, propietario, descripcion, estado, id]
+    const [result] = await pool.query(
+      'UPDATE Empenios SET Nombres_Cliente = ?, Apellidos_Cliente = ?, Artefacto = ?, Marca = ?, Fecha = ?, Monto = ?, Detalles=?, Estado=? WHERE idEmpenios = ? AND empresaId = ?',
+      [nombres, apellidos, artefacto, marca, fecha, monto, descripcion, estado, id, req.session.user.empresaId]
     );
 
-    res.redirect('back'); 
+    if (result.affectedRows === 0) {
+      return res.status(403).send('No tienes permiso para editar este empeño');
+    }
+
+    res.redirect(req.get("Referrer") || "/empenio");
   } catch (error) {
     console.error('Error al actualizar el empeño:', error);
     res.status(500).send('Error al actualizar los datos');
@@ -135,12 +177,12 @@ app.post('/actualizar-empenio/:id', async (req, res) => {
 });
 
 app.post('/guardar-empenio', async (req, res) => {
-  const { nombres, apellidos, artefacto, marca, fecha, monto, propietario, descripcion } = req.body;
+  const { nombres, apellidos, artefacto, marca, fecha, monto, descripcion } = req.body;
 
   try {
     await pool.execute(
-      'INSERT INTO Empenios (Nombres_Cliente, Apellidos_Cliente, Artefacto, Marca, Fecha, Monto, Propietario, Detalles, usuarioId, empresaId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [nombres, apellidos, artefacto, marca, fecha, monto, propietario, descripcion, req.session.user.id, req.session.user.empresaId]
+      'INSERT INTO Empenios (Nombres_Cliente, Apellidos_Cliente, Artefacto, Marca, Fecha, Monto, Detalles, usuarioId, empresaId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [nombres, apellidos, artefacto, marca, fecha, monto, descripcion, req.session.user.id, req.session.user.empresaId]
     );
 
     res.redirect('/cashflow'); // Redirige a la lista de transacciones después de guardar
@@ -150,23 +192,6 @@ app.post('/guardar-empenio', async (req, res) => {
   }
 });
 
-app.get('/agregar-interes/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [rows] = await pool.query('SELECT * FROM Empenios WHERE idEmpenios = ?', [id]);
-    if (rows.length === 0) {
-      return res.status(404).send('Empeño no encontrado');
-    }
-    let empenio = rows[0];
-    empenio.Fecha = empenio.Fecha.toISOString().split('T')[0];
-    res.render('agregar_interes', { empenio: rows[0] });
-  } catch (error) {
-    console.error('Error al obtener el empeño:', error);
-    res.status(500).send('Error al cargar la página de edición');
-  }
-});
-
-
 
 
 app.post('/:id/interes', async (req, res) => {
@@ -174,9 +199,21 @@ app.post('/:id/interes', async (req, res) => {
   const { monto, descripcion, fecha } = req.body;
 
   try {
+    // Verify empeño ownership
+    const [empenios] = await pool.execute('SELECT idEmpenios FROM Empenios WHERE idEmpenios = ? AND empresaId = ?', [id, req.session.user.empresaId]);
+
+    if (empenios.length === 0) {
+      return res.status(403).json({ error: 'No tienes permiso para agregar intereses a este empeño' });
+    }
+
+    await ensureTransaccionesLossColumn();
+    await ensureTransaccionesEstadoColumn();
+
     await pool.execute(
-      'INSERT INTO Interes (id, Monto, Descripcion, Fecha) VALUES (?, ?, ?, ?)',
-      [id, monto, descripcion, fecha]
+      `INSERT INTO transacciones
+        (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, id_empenio, estado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['entrada', 'interes', monto, 0, 0, descripcion, fecha, req.session.user.id, req.session.user.empresaId, id, 'activa']
     );
 
     return res.status(201).json({ message: 'Interés agregado correctamente' });
@@ -188,7 +225,7 @@ app.post('/:id/interes', async (req, res) => {
 
 // Actualizar un interés existente asociado a un empeño
 app.put('/:id/interes', async (req, res) => {
-  const { id } = req.params; // id del empeño
+  const { id } = req.params;
   const { originalFecha, originalMonto, originalDescripcion, fecha, monto, descripcion } = req.body;
 
   if (!originalFecha || !originalMonto || !originalDescripcion) {
@@ -196,9 +233,37 @@ app.put('/:id/interes', async (req, res) => {
   }
 
   try {
+    // Verify empeño ownership
+    const [empenios] = await pool.execute('SELECT idEmpenios FROM Empenios WHERE idEmpenios = ? AND empresaId = ?', [id, req.session.user.empresaId]);
+
+    if (empenios.length === 0) {
+      return res.status(403).json({ error: 'No tienes permiso para actualizar intereses en este empeño' });
+    }
+
+    await ensureTransaccionesLossColumn();
+
+    const [matchRows] = await pool.execute(
+      `SELECT id
+         FROM transacciones
+        WHERE id_empenio = ?
+          AND categoria = 'interes'
+          AND DATE(fecha) = ?
+          AND monto_total = ?
+          AND descripcion = ?
+        ORDER BY id DESC
+        LIMIT 1`,
+      [id, originalFecha, originalMonto, originalDescripcion]
+    );
+
+    if (matchRows.length === 0) {
+      return res.status(404).json({ error: 'Interés no encontrado para actualizar' });
+    }
+
     const [result] = await pool.execute(
-      'UPDATE Interes SET Fecha = ?, Monto = ?, Descripcion = ? WHERE id = ? AND Fecha = ? AND Monto = ? AND Descripcion = ?',
-      [fecha, monto, descripcion, id, originalFecha, originalMonto, originalDescripcion]
+      `UPDATE transacciones
+          SET fecha = ?, monto_total = ?, descripcion = ?
+        WHERE id = ?`,
+      [fecha, monto, descripcion, matchRows[0].id]
     );
 
     if (result.affectedRows === 0) {
@@ -214,7 +279,7 @@ app.put('/:id/interes', async (req, res) => {
 
 // Eliminar un interés asociado a un empeño
 app.delete('/:id/interes', async (req, res) => {
-  const { id } = req.params; // id del empeño
+  const { id } = req.params;
   const { fecha, monto, descripcion } = req.body;
 
   if (!fecha || !monto || !descripcion) {
@@ -222,27 +287,70 @@ app.delete('/:id/interes', async (req, res) => {
   }
 
   try {
-    const [result] = await pool.execute(
-      'DELETE FROM Interes WHERE id = ? AND Fecha = ? AND Monto = ? AND Descripcion = ?',
+    // Verify empeño ownership
+    const [empenios] = await pool.execute('SELECT idEmpenios FROM Empenios WHERE idEmpenios = ? AND empresaId = ?', [id, req.session.user.empresaId]);
+
+    if (empenios.length === 0) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar intereses en este empeño' });
+    }
+
+    await ensureTransaccionesLossColumn();
+
+    const [matchRows] = await pool.execute(
+      `SELECT id
+         FROM transacciones
+        WHERE id_empenio = ?
+          AND categoria = 'interes'
+          AND DATE(fecha) = ?
+          AND monto_total = ?
+          AND descripcion = ?
+        ORDER BY id DESC
+        LIMIT 1`,
       [id, fecha, monto, descripcion]
     );
 
-    if (result.affectedRows === 0) {
+    if (matchRows.length === 0) {
       return res.status(404).json({ error: 'Interés no encontrado para eliminar' });
     }
 
-    res.json({ message: 'Interés eliminado correctamente' });
+    const [result] = await pool.execute(
+      "UPDATE transacciones SET estado = 'anulada' WHERE id = ?",
+      [matchRows[0].id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Interés no encontrado para anular' });
+    }
+
+    res.json({ message: 'Interés anulado correctamente' });
   } catch (error) {
-    console.error('Error al eliminar el interés:', error);
-    res.status(500).json({ error: 'Error al eliminar el interés' });
+    console.error('Error al anular el interés:', error);
+    res.status(500).json({ error: 'Error al anular el interés' });
   }
 });
 app.get('/:id/detalle', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [empenioData] = await pool.execute('SELECT * FROM Empenios WHERE idEmpenios = ?', [id]);
-    const [interesesData] = await pool.execute('SELECT * FROM Interes WHERE id = ?', [id]);
+    await ensureTransaccionesLossColumn();
+    const [empenioData] = await pool.execute(
+      `SELECT emp.*, e.nombre AS empresaNombre
+         FROM Empenios emp
+    LEFT JOIN empresa e ON e.id = emp.empresaId
+        WHERE emp.idEmpenios = ?`,
+      [id]
+    );
+    const [interesesData] = await pool.execute(
+      `SELECT
+          DATE(fecha) AS Fecha,
+          monto_total AS Monto,
+          descripcion AS Descripcion
+         FROM transacciones
+        WHERE id_empenio = ?
+          AND categoria = 'interes'
+        ORDER BY fecha ASC, id ASC`,
+      [id]
+    );
 
     if (empenioData.length === 0) {
       return res.status(404).send('Empeño no encontrado');
@@ -250,7 +358,8 @@ app.get('/:id/detalle', async (req, res) => {
 
     let empenio = empenioData[0];
     empenio.Fecha = empenio.Fecha.toISOString().split('T')[0];
-    // Siempre devolvemos los datos en formato JSON (ya no se renderiza la vista "detalle")
+    empenio.isEditable = empenio.empresaId === req.session.user.empresaId;
+
     return res.json({
       empenio,
       intereses: interesesData
@@ -265,30 +374,32 @@ app.get('/:id/detalle', async (req, res) => {
 // Obtener totales por mes
 app.get('/totales', async (req, res) => {
   try {
+    await ensureTransaccionesLossColumn();
     const [capital] = await pool.query(`
-            SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total - monto_ganancia) AS capital
+      SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total - monto_ganancia - COALESCE(monto_perdida, 0)) AS capital
             FROM transacciones
-            WHERE tipo = "entrada"
+            WHERE tipo = "entrada" AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
     const [ganancias] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_ganancia) AS ganancias
             FROM transacciones
+            WHERE estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
     const [entradas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS entradas
             FROM transacciones
-            WHERE tipo = "entrada"
+            WHERE tipo = "entrada" AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
     const [salidas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS salidas
             FROM transacciones
-            WHERE tipo = "salida"
+            WHERE tipo = "salida" AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
@@ -304,4 +415,42 @@ app.get('/totales', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener totales por mes' });
   }
 });
+
+// Guardar empeño + transacción de préstamo en una sola operación atómica
+app.post('/guardar-empenio-con-transaccion', async (req, res) => {
+  const {
+    nombres, apellidos, artefacto, marca, fecha_empenio, monto_empenio, descripcion_empenio,
+    monto_prestamo, fecha_prestamo, descripcion_prestamo, nota
+  } = req.body;
+
+  const connection = await pool.getConnection();
+  try {
+    await ensureTransaccionesLossColumn();
+    await ensureTransaccionesEstadoColumn();
+    await connection.beginTransaction();
+
+    const [resultEmp] = await connection.execute(
+      'INSERT INTO Empenios (Nombres_Cliente, Apellidos_Cliente, Artefacto, Marca, Fecha, Monto, Detalles, Estado, usuarioId, empresaId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [nombres, apellidos, artefacto, marca, fecha_empenio, monto_empenio, descripcion_empenio || '', 'Activo', req.session.user.id, req.session.user.empresaId]
+    );
+
+    const empenioId = resultEmp.insertId;
+
+    await connection.execute(
+      `INSERT INTO transacciones (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, nota, id_empenio, estado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['salida', 'prestamo', monto_prestamo, 0, 0, descripcion_prestamo || '', fecha_prestamo, req.session.user.id, req.session.user.empresaId, nota || null, empenioId, 'activa']
+    );
+
+    await connection.commit();
+    res.redirect('/cashflow');
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al guardar empeño con transacción:', error);
+    res.status(500).send('Error al guardar los datos');
+  } finally {
+    connection.release();
+  }
+});
+
 export default app;

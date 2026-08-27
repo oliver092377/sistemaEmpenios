@@ -1,24 +1,58 @@
 import express from 'express';
-import mysql from 'mysql2/promise';
 import path from 'path';
 import session from 'express-session';
+import MySQLStoreFactory from 'express-mysql-session';
 import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import { pool } from './db.js';
 import cashflowRouter from './routes/cashflow.js';
 import empenioRouter from './routes/empenio.js';
 
+dotenv.config({ quiet: true });
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: true })); // Para datos de formularios
 app.use(express.json()); // Para datos en formato JSON
 app.use(express.static('public'));
 
+async function ensureFechaInicioSistemaColumn() {
+    try {
+        const [rows] = await pool.query(
+            `SELECT COUNT(*) AS total
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'config_caja'
+                AND COLUMN_NAME = 'fecha_inicio_sistema'`
+        );
+        if (!rows[0]?.total) {
+            await pool.query(
+                "ALTER TABLE config_caja ADD COLUMN fecha_inicio_sistema DATE NULL AFTER cierre_autorizado"
+            );
+        }
+    } catch (e) {
+        console.error('Error ensuring fecha_inicio_sistema column:', e);
+    }
+}
+
 // Configuración de sesión para manejo de login
+const MySQLStore = MySQLStoreFactory(session);
+const sessionStore = new MySQLStore({
+  host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '1234',
+  database: process.env.DB_NAME || 'mydb',
+  createDatabaseTable: true,
+});
+
 app.use(
   session({
-    secret: 'empenios_app_secret_key',
+    secret: process.env.SESSION_SECRET || 'empenios_app_secret_key',
     resave: false,
     saveUninitialized: false,
+    store: sessionStore,
   })
 );
 
@@ -33,16 +67,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.resolve('views')); // Carpeta donde estarán las vistas
 
 // Configuración de la conexión con MySQL
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  port: 3306,
-  password: '1234',
-  database: 'mydb',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+// El pool de conexiones se importa desde ./db.js (configuración centralizada)
 
 const isAdminUser = (req) => (req.session?.user?.rol || '').toLowerCase() === 'admin';
 
@@ -103,7 +128,7 @@ app.post('/login', async (req, res) => {
       nombre: user.nombre,
       empresaId: user.empresaId,
       isAdminUser: isAdminUser({ session: { user } })
-
+      
     };
 
     return res.redirect('/dashboard');
@@ -123,15 +148,42 @@ app.get('/logout', (req, res) => {
 // Rutas protegidas
 app.get('/dashboard', requireAuth, async (req, res) => {
   try {
-    res.render('dashboard.ejs');
-  } catch (error) {
-    console.error('Error al cargar el dashboard:', error);
-    res.status(500).send('Error al obtener los datos');
-  }
-});
-app.get('/prueba', requireAuth, async (req, res) => {
-  try {
-    res.render('Empenios_copy.ejs');
+    const isAdmin = isAdminUser(req);
+    let dashboardData = null;
+
+    if (isAdmin) {
+      const empresaId = req.session.user.empresaId;
+
+      const [empresaRows] = await pool.query(
+        'SELECT capital, nombre FROM empresa WHERE id = ? LIMIT 1',
+        [empresaId]
+      );
+
+      const [prestamoRows] = await pool.query(
+        `SELECT IFNULL(SUM(Monto), 0) AS dinero_empleado
+           FROM Empenios
+          WHERE empresaId = ?
+            AND LOWER(Estado) = 'activo'`,
+        [empresaId]
+      );
+
+      const capitalTotal = Number(empresaRows[0]?.capital || 0);
+      const dineroEmpleado = Number(prestamoRows[0]?.dinero_empleado || 0);
+      const saldoDisponible = capitalTotal - dineroEmpleado;
+
+      dashboardData = {
+        empresaNombre: empresaRows[0]?.nombre || 'Empresa',
+        capitalTotal,
+        dineroEmpleado,
+        saldoDisponible,
+      };
+    }
+
+    res.render('dashboard.ejs', {
+      isAdmin,
+      dashboardData,
+      user: req.session.user
+    });
   } catch (error) {
     console.error('Error al cargar el dashboard:', error);
     res.status(500).send('Error al obtener los datos');
@@ -149,7 +201,10 @@ app.get('/interests', requireAuth, async (req, res) => {
 
 app.get('/reports', requireAuth, async (req, res) => {
   try {
-    res.render('reports.ejs');
+    res.render('reports.ejs', {
+      user: req.session.user,
+      isAdmin: isAdminUser(req)
+    });
   } catch (error) {
     console.error('Error al cargar la página de reportes:', error);
     res.status(500).send('Error al obtener los datos');
@@ -158,13 +213,14 @@ app.get('/reports', requireAuth, async (req, res) => {
 
 app.get('/settings', requireAuth, async (req, res) => {
   try {
+    await ensureFechaInicioSistemaColumn();
     const empresaId = req.session.user.empresaId;
     const [configRows] = await pool.query(
-      'SELECT saldo_inicial_manual, cierre_autorizado FROM config_caja WHERE empresaId = ? LIMIT 1',
+      'SELECT saldo_inicial_manual, cierre_autorizado, fecha_inicio_sistema FROM config_caja WHERE empresaId = ? LIMIT 1',
       [empresaId]
     );
 
-    const config = configRows[0] || { saldo_inicial_manual: null, cierre_autorizado: 0 };
+    const config = configRows[0] || { saldo_inicial_manual: null, cierre_autorizado: 0, fecha_inicio_sistema: null };
 
     res.render('settings.ejs', {
       config,
@@ -185,22 +241,25 @@ app.post('/settings/caja', requireAuth, async (req, res) => {
   }
 
   const empresaId = req.session.user.empresaId;
-  const { saldo_inicial_manual, cierre_autorizado } = req.body;
+  const { saldo_inicial_manual, cierre_autorizado, fecha_inicio_sistema } = req.body;
 
   const saldoInicial = saldo_inicial_manual === '' || saldo_inicial_manual === undefined
     ? null
     : parseFloat(saldo_inicial_manual);
 
   const autorizado = cierre_autorizado ? 1 : 0;
+  const fechaInicio = fecha_inicio_sistema || null;
 
   try {
+    await ensureFechaInicioSistemaColumn();
     await pool.query(
-      `INSERT INTO config_caja (empresaId, saldo_inicial_manual, cierre_autorizado)
-       VALUES (?, ?, ?)
+      `INSERT INTO config_caja (empresaId, saldo_inicial_manual, cierre_autorizado, fecha_inicio_sistema)
+       VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          saldo_inicial_manual = VALUES(saldo_inicial_manual),
-         cierre_autorizado = VALUES(cierre_autorizado)`,
-      [empresaId, saldoInicial, autorizado]
+         cierre_autorizado = VALUES(cierre_autorizado),
+         fecha_inicio_sistema = VALUES(fecha_inicio_sistema)`,
+      [empresaId, saldoInicial, autorizado, fechaInicio]
     );
 
     res.redirect('/settings?saved=1');

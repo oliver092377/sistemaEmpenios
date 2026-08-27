@@ -24,6 +24,7 @@
                         <div class="card-body">
                             <!-- Formulario de transacción actualizado -->
                             <form action="/cashflow/guardar-transaccion" method="POST" id="transactionForm">
+                                <input type="hidden" name="sin_empenio" id="sinEmpenioFlag" value="">
                                 <div class="row">
 
                                     <div class="col-md-3 mb-3">
@@ -48,7 +49,7 @@
                                     </div>
 
                                     <div class="col-md-6 mb-3 d-none" id="empenioPicker">
-                                        <label class="form-label">Seleccionar empeño (recogida o interés)</label>
+                                        <label class="form-label">Seleccionar empeño (venta, recogida o interés)</label>
                                         <input type="text" class="form-control" id="empenioSearch" placeholder="Buscar por cliente, artefacto, marca o monto">
                                         <input type="hidden" name="id_empenio" id="empenioId">
                                         <div class="list-group mt-2" id="empenioResults"></div>
@@ -62,12 +63,21 @@
                                             name="monto" required>
                                     </div>
 
+                                    <div class="col-md-3 mb-3 d-none" id="resultadoTipoGroup">
+                                        <label class="form-label d-block">Resultado de la transacción</label>
+                                        <div class="btn-group w-100" role="group" aria-label="Resultado de la transacción">
+                                            <input type="radio" class="btn-check" name="resultadoTipo" id="resultadoGanancia" value="ganancia" checked>
+                                            <label class="btn btn-outline-success" for="resultadoGanancia">Ganancia</label>
+                                            <input type="radio" class="btn-check" name="resultadoTipo" id="resultadoPerdida" value="perdida">
+                                            <label class="btn btn-outline-danger" for="resultadoPerdida">Pérdida</label>
+                                        </div>
+                                        <input type="hidden" name="resultado_tipo_final" id="resultadoTipoFinal" value="ganancia">
+                                    </div>
+
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Monto Ganancia</label>
+                                        <label class="form-label" id="transactionAmountLabel">Monto Gananciass</label>
                                         <input type="number" class="form-control" placeholder="S/ 0.00" step="0.01"
-                                            name="ganancia" id="transactionGanancia">
-
-
+                                            name="monto_resultado" id="transactionMontoResultado">
                                     </div>
 
                                     <div class="col-md-6 mb-3">
@@ -176,6 +186,7 @@
                                             <th>Categoría</th>
                                             <th>Monto Total</th>
                                             <th>Ganancia</th>
+                                            <th>Pérdida</th>
                                             <th>Capital</th>
                                             <th>Encargado</th>
                                             <th>Nota</th>
@@ -212,11 +223,15 @@
                                                     S/ <%= transaccion.monto_ganancia %>
                                                 </td>
                                                 <td
+                                                    class=" <%= transaccion.tipo === 'entrada' && Number(transaccion.monto_perdida || 0) > 0 ? 'expense' : transaccion.tipo === 'entrada' ? 'income' : 'expense' %>">
+                                                    S/ <%= Number(transaccion.monto_perdida || 0).toFixed(2) %>
+                                                </td>
+                                                <td
                                                     class=" <%= transaccion.tipo === 'entrada' ? 'income' : 'expense' %>">
-                                                    S/ <%= transaccion.monto_total-transaccion.monto_ganancia %>
+                                                    S/ <%= Number(transaccion.monto_total-transaccion.monto_ganancia+Number(transaccion.monto_perdida || 0)).toFixed(2) %>
                                                 </td>
                                                 <td>
-                                                    <%= user.nombre %>
+                                                    <%= transaccion.nombreUsuario || transaccion.usuarioId %>
                                                 </td>
                                                 <td>
                                                     <% if (transaccion.nota) { %>
@@ -226,18 +241,29 @@
                                                     <% } %>
                                                 </td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-primary"
-                                                        data-id="<%= transaccion.id %>"
-                                                        data-nota="<%= transaccion.nota || '' %>">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <form action="/cashflow/eliminar-transaccion" method="POST"
-                                                        style="display:inline;"
-                                                        onsubmit="return confirm('¿Está seguro que desea eliminar esta transacción?');">
-                                                        <input type="hidden" name="id" value="<%= transaccion.id %>">
-                                                        <button type="submit" class="btn btn-sm btn-danger"><i
-                                                                class="fas fa-trash"></i></button>
-                                                    </form>
+                                                    <%
+                                                        const fechaTrans = transaccion.fecha.toISOString().split('T')[0];
+                                                        const esHoy = fechaTrans === fechaHoy;
+                                                        const esRecogidaOVenta = transaccion.tipo === 'entrada' && (transaccion.categoria === 'empenio' || transaccion.categoria === 'venta');
+                                                        const puedeEditar = esHoy || user.isAdminUser;
+                                                        const puedeAnular = user.isAdminUser || (esHoy && !esRecogidaOVenta);
+                                                    %>
+                                                    <% if (puedeEditar) { %>
+                                                        <button class="btn btn-sm btn-primary"
+                                                            data-id="<%= transaccion.id %>"
+                                                            data-nota="<%= transaccion.nota || '' %>">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                    <% } %>
+                                                    <% if (puedeAnular) { %>
+                                                        <form action="/cashflow/anular-transaccion" method="POST"
+                                                            style="display:inline;"
+                                                            onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
+                                                            <input type="hidden" name="id" value="<%= transaccion.id %>">
+                                                            <button type="submit" class="btn btn-sm btn-danger"><i
+                                                                    class="fas fa-ban"></i></button>
+                                                        </form>
+                                                    <% } %>
                                                 </td>
 
                                             </tr>
@@ -271,12 +297,23 @@
             <div class="row mb-3">
                 <div class="col-lg-12">
                     <div class="card shadow-sm">
-                        <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                        <div class="card-body d-flex flex-wrap align-items-center gap-2" data-saldo-inicial="<%= saldoInicialDia !== null && saldoInicialDia !== undefined ? Number(saldoInicialDia).toFixed(2) : '' %>">
                             <label class="form-label mb-0 me-2">Capital inicial del día:</label>
-                            <input type="number" step="0.01" min="0" class="form-control" style="max-width: 180px;" id="initialCapitalInput" placeholder="Ej: 1000">
+                            <div class="fw-bold" id="initialCapitalValue">
+                                <% if (saldoInicialDia !== null && saldoInicialDia !== undefined) { %>
+                                    S/ <%= Number(saldoInicialDia).toFixed(2) %>
+                                <% } else { %>
+                                    No definido
+                                <% } %>
+                            </div>
                             <button class="btn btn-primary ms-2" id="calculateDaySummaryBtn">CALCULAR</button>
                             <small class="text-muted ms-2">Suma entradas de capital, descuenta salidas y separa la ganancia.</small>
                         </div>
+                        <% if (saldoInicialDia === null || saldoInicialDia === undefined) { %>
+                            <div class="card-footer text-muted small">
+                                Defina el saldo inicial en Configuracion antes del primer cierre.
+                            </div>
+                        <% } %>
                     </div>
                 </div>
             </div>
@@ -289,6 +326,14 @@
                             <h6 class="m-0 font-weight-bold text-primary">Transacciones del Día Actual</h6>
                         </div>
                         <div class="card-body">
+                            <div class="mb-2 text-muted">
+                                Capital inicial del día:
+                                <% if (saldoInicialDia !== null && saldoInicialDia !== undefined) { %>
+                                    <strong>S/ <%= Number(saldoInicialDia).toFixed(2) %></strong>
+                                <% } else { %>
+                                    <strong>No definido</strong>
+                                <% } %>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-bordered transaction-table">
                                     <thead>
@@ -299,6 +344,7 @@
                                             <th>Categoría</th>
                                             <th>Monto Total</th>
                                             <th>Ganancia</th>
+                                            <th>Pérdida</th>
                                             <th>Capital</th>
                                             <th>Encargado</th>
                                             <th>Nota</th>
@@ -307,7 +353,7 @@
                                     </thead>
                                     <tbody id="currentDayTransactionsBody">
                                         <tr>
-                                            <td colspan="10" class="text-center">Cargando...</td>
+                                            <td colspan="11" class="text-center">Cargando...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -367,6 +413,7 @@
                                             <th>Categoría</th>
                                             <th>Monto Total</th>
                                             <th>Ganancia</th>
+                                            <th>Pérdida</th>
                                             <th>Capital</th>
                                             <th>Encargado</th>
                                             <th>Nota</th>
@@ -375,7 +422,7 @@
                                     </thead>
                                     <tbody id="currentMonthTransactionsBody">
                                         <tr>
-                                            <td colspan="10" class="text-center">Cargando...</td>
+                                            <td colspan="11" class="text-center">Cargando...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -386,34 +433,6 @@
             </div>
             <% } %>
 
-            <!-- Charts -->
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="card shadow mb-4">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 font-weight-bold text-primary">Ganancias por mes</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="chart-container">
-                                <canvas id="GananciaChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-6">
-                    <div class="card shadow mb-4">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 font-weight-bold text-primary">Flujo Mensual</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="chart-container">
-                                <canvas id="flowChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             <!-- Modal para Editar Transacción -->
             <div class="modal fade" id="editTransactionModal" tabindex="-1" aria-labelledby="editTransactionModalLabel"
                 data-bs-backdrop="static" aria-hidden="true">
@@ -446,10 +465,15 @@
                                     <input type="number" class="form-control" id="editTransactionMonto" name="monto"
                                         step="0.01" required>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3" id="gananciaGroup">
                                     <label class="form-label">Monto Ganancia</label>
                                     <input type="number" class="form-control" id="editTransactionGanancia"
                                         name="ganancia" step="0.01" required>
+                                </div>
+                                <div class="mb-3" id="perdidaGroup">
+                                    <label class="form-label">Monto Pérdida</label>
+                                    <input type="number" class="form-control" id="editTransactionPerdida"
+                                        name="perdida" step="0.01" required>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Descripción</label>
@@ -478,23 +502,27 @@
             </div>
 
 
-            <!-- Modal para registrar un nuevo empeño después de un préstamo -->
+            <!-- Modal para registrar un nuevo empeño + préstamo en una sola operación -->
             <div class="modal fade" id="addEmpenioFromCashflowModal" tabindex="-1" aria-hidden="true"
                 data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
-                        <form action="/empenio/guardar-empenio" method="POST" id="newEmpenioFromCashflowForm">
+                        <form action="/empenio/guardar-empenio-con-transaccion" method="POST" id="newEmpenioFromCashflowForm">
+                            <input type="hidden" name="monto_prestamo" id="modalMontoPrestamo">
+                            <input type="hidden" name="fecha_prestamo" id="modalFechaPrestamo">
+                            <input type="hidden" name="descripcion_prestamo" id="modalDescripcionPrestamo">
+                            <input type="hidden" name="nota" id="modalNotaPrestamo">
                             <div class="modal-header">
-                                <h5 class="modal-title">Registrar Nuevo Empeño</h5>
+                                <h5 class="modal-title">Registrar Nuevo Empeño + Préstamo</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"
                                     aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <p class="mb-3">
-                                    Se ha registrado una transacción de salida/préstamo. Para mantener la coherencia del
-                                    flujo de trabajo,
-                                    registre el empeño asociado.
-                                </p>
+                                <div class="alert alert-info mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    El préstamo y el empeño se registrarán en una sola operación. Si ocurre un error, se deshace todo.
+                                </div>
+                                <h6 class="text-primary mb-2">Datos del Empeño</h6>
                                 <div class="row">
                                     <div class="col-md-6 mb-2">
                                         <label class="form-label">Nombres:</label>
@@ -514,33 +542,21 @@
                                     </div>
                                     <div class="col-md-6 mb-2">
                                         <label class="form-label">Fecha:</label>
-                                        <input type="date" class="form-control" name="fecha" id="newEmpenioFecha"
-                                            required>
+                                        <input type="date" class="form-control" name="fecha_empenio" id="newEmpenioFecha" required>
                                     </div>
                                     <div class="col-md-6 mb-2">
                                         <label class="form-label">Monto:</label>
-                                        <input type="number" class="form-control" name="monto" id="newEmpenioMonto"
-                                            step="0.01" required>
+                                        <input type="number" class="form-control" name="monto_empenio" id="newEmpenioMonto" step="0.01" required>
                                     </div>
                                     <div class="col-12 mb-2">
-                                        <label class="form-label">Descripción:</label>
-                                        <textarea class="form-control" name="descripcion" rows="3"></textarea>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Propietario:</label>
-                                        <select class="form-select" name="propietario" required>
-                                            <option value="">Seleccione un propietario</option>
-                                            <option value="Tienda">Tienda</option>
-                                            <option value="Orlando">Orlando</option>
-                                            <option value="Oscar">Oscar</option>
-                                            <option value="Oliver">Oliver</option>
-                                        </select>
+                                        <label class="form-label">Descripción del empeño:</label>
+                                        <textarea class="form-control" name="descripcion_empenio" rows="2"></textarea>
                                     </div>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="submit" class="btn btn-primary">Guardar Empeño</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Omitir</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Empeño y Préstamo</button>
                             </div>
                         </form>
                     </div>
@@ -563,40 +579,45 @@
                 </div>
             </div>
 
+            <!-- Modal de confirmación: transacción sin empeño asociado -->
+            <div class="modal fade" id="confirmSinEmpenioModal" tabindex="-1" aria-hidden="true"
+                data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Advertencia: Empeño no asociado</h5>
+                        </div>
+                        <div class="modal-body">
+                            <p id="confirmSinEmpenioMessage" class="mb-3"></p>
+                            <div class="alert alert-secondary mb-0">
+                                <small><strong>NOTA:</strong> El sistema tiene empeños desde: <strong id="confirmSinEmpenioFecha"></strong></small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" id="btnNoSeguro" data-bs-dismiss="modal">
+                                <i class="fas fa-arrow-left me-1"></i>No estoy seguro
+                            </button>
+                            <button type="button" class="btn btn-success" id="btnSeguro">
+                                <i class="fas fa-check me-1"></i>Sí, estoy seguro de que no existe el empeño
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
             <!-- Más contenido específico -->
         </div>
 
         <%- include('partials/footer') %>
 
+            <script>window.isAdminUser = <%= user.isAdminUser ? 'true' : 'false' %>;</script>
             <%- include('partials/scripts', {currentPage: 'cashflow' }) %>
                 <script>
-                    //const shouldOpenEmpenioModal = <%= nuevoEmpenio ? 'true' : 'false' %>;
-                    const shouldOpenEmpenioModal = "<%= nuevoEmpenio %>" === "true";
-                    console.log("shouldOpenEmpenioModal:", shouldOpenEmpenioModal);
-                    const defaultEmpenioMonto = "<%= montoEmpenio || '' %>";
-                    const defaultEmpenioFecha = "<%= fechaEmpenio || '' %>";
-                    // Scripts específicos para la página de flujo de caja
+                    const fechaInicioSistema = "<%= fechaInicioSistema ? (fechaInicioSistema instanceof Date ? fechaInicioSistema.toISOString().split('T')[0] : fechaInicioSistema) : 'No definida' %>";
                     document.addEventListener('DOMContentLoaded', function () {
-                        console.log('Página de flujo de caja cargada');
                         loadCurrentMonthTransactions();
-                        if (shouldOpenEmpenioModal) {
-                            const modalEl = document.getElementById('addEmpenioFromCashflowModal');
-                            if (modalEl) {
-                                const fechaInput = document.getElementById('newEmpenioFecha');
-                                if (fechaInput && defaultEmpenioFecha) {
-                                    fechaInput.value = defaultEmpenioFecha;
-                                }
-                                const montoInput = document.getElementById('newEmpenioMonto');
-                                if (montoInput && defaultEmpenioMonto) {
-                                    montoInput.value = defaultEmpenioMonto;
-                                }
-                                const empModal = new bootstrap.Modal(modalEl);
-                                empModal.show();
-                            }
-                        }
                     });
-                    console.log("funciona");
                 </script>
                 </body>
 

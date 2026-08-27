@@ -2,7 +2,12 @@ document.addEventListener("DOMContentLoaded", function () {
     // Manejo dinámico del formulario de nueva transacción
     const typeSelect = document.getElementById("transactionType");
     const categorySelect = document.getElementById("transactionCategory");
-    const gananciaInput = document.getElementById("transactionGanancia"); // Selecciona el campo de ganancia
+    const amountInput = document.getElementById("transactionMontoResultado");
+    const amountLabel = document.getElementById("transactionAmountLabel");
+    const resultadoTipoGroup = document.getElementById("resultadoTipoGroup");
+    const resultadoGanancia = document.getElementById("resultadoGanancia");
+    const resultadoPerdida = document.getElementById("resultadoPerdida");
+    const resultadoTipoFinal = document.getElementById("resultadoTipoFinal");
 
     const empenioPicker = document.getElementById("empenioPicker");
     const empenioSearch = document.getElementById("empenioSearch");
@@ -15,6 +20,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const editTypeSelect = document.getElementById("editTransactionType");
     const editCategorySelect = document.getElementById("editTransactionCategory");
     const editGananciaInput = document.getElementById("editTransactionGanancia");
+    const editPerdidaInput = document.getElementById("editTransactionPerdida");
 
     const form = document.getElementById("transactionForm");
     const editForm = document.getElementById("editTransactionForm");
@@ -37,18 +43,19 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("El valor de el tipo no es nulo");
     }
     // Si no estamos en la página que tiene el formulario, salir
-    if (!typeSelect || !categorySelect || !gananciaInput || !form) {
+    if (!typeSelect || !categorySelect || !amountInput || !form) {
         return;
     }
 
     // Al cargar la página, el select de categoría está deshabilitado
     categorySelect.setAttribute("disabled", "true");
-    // Al cargar la página, el campo de ganancia está habilitado
-    gananciaInput.removeAttribute("disabled");
+    if (resultadoTipoGroup) {
+        resultadoTipoGroup.classList.add("d-none");
+    }
 
     const allCategories = [
         { value: "", text: "Seleccionar..." },
-        { value: "empenio", text: "Recogida de Empeñossss" },
+        { value: "empenio", text: "Recogida de Empeños" },
         { value: "venta", text: "Venta de Producto" },
         { value: "interes", text: "Dejo a cuenta/Interes" },
         { value: "prestamo", text: "Préstamo" },
@@ -69,7 +76,43 @@ document.addEventListener("DOMContentLoaded", function () {
     ];
 
     const shouldPickEmpenio = () =>
-        typeSelect.value === "entrada" && (categorySelect.value === "empenio" || categorySelect.value === "interes");
+        typeSelect.value === "entrada" && (
+            categorySelect.value === "empenio" ||
+            categorySelect.value === "venta" ||
+            categorySelect.value === "interes"
+        );
+
+    const shouldUseResultadoSelector = () =>
+        typeSelect.value === "entrada" && (
+            categorySelect.value === "empenio" ||
+            categorySelect.value === "venta"
+        );
+
+    const syncResultadoMode = () => {
+        if (!amountInput || !amountLabel) {
+            return;
+        }
+
+        if (shouldUseResultadoSelector()) {
+            resultadoTipoGroup?.classList.remove("d-none");
+            amountLabel.textContent = resultadoPerdida?.checked ? "Monto Pérdida" : "Monto Ganancia";
+            amountInput.placeholder = "S/ 0.00";
+        } else {
+            resultadoTipoGroup?.classList.add("d-none");
+            if (resultadoGanancia) {
+                resultadoGanancia.checked = true;
+            }
+            //bloquear el amountInput para que no se pueda escribir nada y sombrar el placeholder
+            amountLabel.textContent = "Monto Ganancia.";
+            /*
+            amountInput.style.color = "#6c757d"; // Gris para indicar que está deshabilitado
+            amountInput.placeholder = "";
+            amountInput.readOnly = true;
+            amountInput.value = "";
+            amountInput.style.backgroundColor = "#e9ecef"; // Fondo gris para indicar que está deshabilitado
+            */
+        }
+    };
 
     const clearEmpenioSelection = () => {
         if (!empenioPicker) return;
@@ -138,7 +181,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!typeSelect.value) {
             categorySelect.innerHTML = "";
             categorySelect.setAttribute("disabled", "true");
-            gananciaInput.removeAttribute("disabled");
+            amountInput.value = "";
+
+            syncResultadoMode();
             clearEmpenioSelection();
             return;
         }
@@ -147,11 +192,21 @@ document.addEventListener("DOMContentLoaded", function () {
         if (typeSelect.value === "entrada") {
             entradaCategories.map((cat) => console.log(cat));
             options = entradaCategories;
-            gananciaInput.removeAttribute("disabled"); // Habilita ganancia
+
+            // Habilitar el input
+            amountInput.disabled = false;
+
         } else if (typeSelect.value === "salida") {
             options = salidaCategories;
-            gananciaInput.setAttribute("disabled", "true"); // Deshabilita ganancia
-            gananciaInput.value = ""; // Opcional: limpia el campo
+            amountInput.value = "";
+
+            // Deshabilitar el input
+            amountInput.disabled = true;
+
+            if (resultadoGanancia) {
+                resultadoGanancia.checked = true;
+            }
+
             clearEmpenioSelection();
         }
         categorySelect.innerHTML = "";
@@ -167,6 +222,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
             clearEmpenioSelection();
         }
+
+        syncResultadoMode();
     });
 
     categorySelect.addEventListener("change", function () {
@@ -175,7 +232,14 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
             clearEmpenioSelection();
         }
+
+        syncResultadoMode();
+        if (!shouldUseResultadoSelector() && amountInput) {
+            amountInput.value = "";
+        }
     });
+
+    resultadoTipoGroup?.addEventListener("change", syncResultadoMode);
 
     if (empenioSearch) {
         empenioSearch.addEventListener("input", (e) => {
@@ -195,16 +259,96 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     form.addEventListener("submit", (event) => {
         if (shouldPickEmpenio() && !empenioIdInput.value) {
-            alert("Selecciona el empeño asociado antes de guardar.");
+            event.preventDefault();
+
+            const categoryNames = {
+                empenio: "recogida de empeño",
+                venta: "venta de producto",
+                interes: "interés"
+            };
+            const categoriaTexto = categoryNames[categorySelect.value] || categorySelect.value;
+
+            const msgEl = document.getElementById("confirmSinEmpenioMessage");
+            if (msgEl) {
+                msgEl.textContent = `Acabas de ingresar una transacción de ${categoriaTexto} sin asociarla a un empeño. ¿Estás seguro de que no existe el empeño?`;
+            }
+
+            const fechaEl = document.getElementById("confirmSinEmpenioFecha");
+            if (fechaEl) {
+                fechaEl.textContent = typeof fechaInicioSistema !== "undefined" && fechaInicioSistema ? fechaInicioSistema : "No definida";
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById("confirmSinEmpenioModal"));
+            modal.show();
+            return;
+        }
+
+        const esPrestamo = typeSelect.value === "salida" && categorySelect.value === "prestamo";
+        if (esPrestamo) {
+            event.preventDefault();
+
+            const montoPrestamoInput = document.querySelector('#transactionForm input[name="monto"]');
+            const fechaInputEl = document.getElementById("fecha");
+            const descInput = document.querySelector('#transactionForm textarea[name="descripcion"]');
+            const notaInput = document.querySelector('#transactionForm textarea[name="nota"]');
+
+            document.getElementById("modalMontoPrestamo").value = montoPrestamoInput ? montoPrestamoInput.value : "";
+            document.getElementById("modalFechaPrestamo").value = fechaInputEl ? fechaInputEl.value : "";
+            document.getElementById("modalDescripcionPrestamo").value = descInput ? descInput.value : "";
+            document.getElementById("modalNotaPrestamo").value = notaInput ? notaInput.value : "";
+
+            const modalFecha = document.getElementById("newEmpenioFecha");
+            const modalMonto = document.getElementById("newEmpenioMonto");
+            if (modalFecha && fechaInputEl) modalFecha.value = fechaInputEl.value;
+            if (modalMonto && montoPrestamoInput) modalMonto.value = montoPrestamoInput.value;
+
+            const modal = new bootstrap.Modal(document.getElementById("addEmpenioFromCashflowModal"));
+            modal.show();
+            return;
+        }
+
+        if (!amountInput.disabled && !amountInput.value) {
+            alert("Ingresa un monto antes de guardar.");
             event.preventDefault();
             return;
         }
-        if (typeSelect.value === "salida") {
-            // Quita el "disabled" para que se envíe
-            gananciaInput.removeAttribute("disabled");
-            gananciaInput.value = 0; // fuerza valor 0
+
+        if (shouldUseResultadoSelector()) {
+            const resultadoEsPerdida = resultadoPerdida?.checked;
+            if (resultadoTipoFinal) {
+                resultadoTipoFinal.value = resultadoEsPerdida ? "perdida" : "ganancia";
+            }
+        } else {
+            if (resultadoTipoFinal) {
+                resultadoTipoFinal.value = "ganancia";
+            }
         }
     });
+
+    const btnSeguro = document.getElementById("btnSeguro");
+    if (btnSeguro) {
+        btnSeguro.addEventListener("click", () => {
+            const sinFlag = document.getElementById("sinEmpenioFlag");
+            if (sinFlag) sinFlag.value = "true";
+
+            if (shouldUseResultadoSelector()) {
+                const resultadoEsPerdida = resultadoPerdida?.checked;
+                if (resultadoTipoFinal) {
+                    resultadoTipoFinal.value = resultadoEsPerdida ? "perdida" : "ganancia";
+                }
+            } else {
+                if (resultadoTipoFinal) {
+                    resultadoTipoFinal.value = "ganancia";
+                }
+            }
+
+            const modalEl = document.getElementById("confirmSinEmpenioModal");
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+
+            form.submit();
+        });
+    }
 });
 
 // Función para manejar la edición de transacciones
@@ -225,26 +369,30 @@ function handleEditButtonClick(e) {
     );
     const categoria = document.getElementById("editTransactionCategory");
     const tipo = document.getElementById("editTransactionType");
+    const monto = document.getElementById("editTransactionMonto");
+    const fecha = document.getElementById("editTransactionFecha");
+    const nota = document.getElementById("editTransactionNota");
+    const id = document.getElementById("editTransactionId");
+    const descripcion = document.getElementById("editTransactionDescripcion");
+    const editPerdidaInput = document.getElementById("editTransactionPerdida");
+    // Hacer inmodificables los campos de monto cuando la transacción es de salida
+    const editGananciaInput = document.getElementById("editTransactionGanancia");
     // Asignar valores al modal
-    document.getElementById("editTransactionId").value =
+    id.value =
         btn.getAttribute("data-id");
-    document.getElementById("editTransactionFecha").value =
+    fecha.value =
         tds[0].innerText.trim();
-    document.getElementById("editTransactionDescripcion").value =
+    descripcion.value =
         tds[2].innerText.trim();
-
-    // nueva línea: llenar nota desde data-nota del botón
-    const nota = btn.getAttribute("data-nota") || "";
-    document.getElementById("editTransactionNota").value = nota;
-
-    document.getElementById("editTransactionType").value = tds[1].innerText
+    nota.value = btn.getAttribute("data-nota") || "";// nueva línea: llenar nota desde data-nota del botón
+    tipo.value = tds[1].innerText
         .trim()
         .toLowerCase();
-    const Micategoria = tds[3].innerText.trim().toLowerCase();
-    document.getElementById("editTransactionMonto").value = tds[4].innerText
+    monto.value = tds[4].innerText.replace("S/", "").trim();
+    editPerdidaInput.value = tds[6].innerText
         .replace("S/", "")
         .trim();
-    document.getElementById("editTransactionGanancia").value = tds[5].innerText
+    editGananciaInput.value = tds[5].innerText
         .replace("S/", "")
         .trim();
 
@@ -254,17 +402,25 @@ function handleEditButtonClick(e) {
         tipo.blur(); // Quita el foco
     });
 
-    // Hacer inmodificable el campo de ganancia si la transacción es de salida pero que sí se envie el valor 0
-    const editGananciaInput = document.getElementById("editTransactionGanancia");
+    const gananciaGroup = document.getElementById("gananciaGroup");
+    const perdidaGroup = document.getElementById("perdidaGroup");
+    const syncEditAmountFields = () => {
+        if (tipo.value === "salida") {
+            gananciaGroup.style.display = "none";
+            perdidaGroup.style.display = "none";
+            editGananciaInput.value = 0;
+            editPerdidaInput.value = 0;
 
-    if (tipo.value === "salida") {
-        editGananciaInput.readOnly = true;
-        editGananciaInput.value = 0;
-    } else {
-        editGananciaInput.readOnly = false;
-    }
+        } else {
+            gananciaGroup.style.display = "block";
+            perdidaGroup.style.display = "block";
+        }
+    };
 
+    tipo.onchange = syncEditAmountFields;
+    syncEditAmountFields();
 
+    const Micategoria = tds[3].innerText.trim().toLowerCase();
     // Actualizar categorías según el tipo
     if (document.getElementById("editTransactionType").value === "entrada") {
         const entradaCategories = [
@@ -280,7 +436,6 @@ function handleEditButtonClick(e) {
             option.value = opt.value;
             option.text = opt.text;
             if (Micategoria === option.value) {
-                console.log("Esta ingresando en el if: ");
                 option.selected = true;
             }
             categoria.appendChild(option);
@@ -546,7 +701,6 @@ async function loadCurrentDayTransactions() {
         const response = await fetch("/cashflow/transacciones-dia-actual");
         const data = await response.json();
         const transacciones = data.transacciones || [];
-        const usuarioNombre = data.usuario || '';
         const tbody = document.getElementById("currentDayTransactionsBody");
 
         // Guarda en memoria para la calculadora diaria
@@ -557,7 +711,7 @@ async function loadCurrentDayTransactions() {
         }
 
         if (!transacciones.length) {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center">No hay transacciones para hoy</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center">No hay transacciones para hoy</td></tr>';
             return;
         }
 
@@ -567,7 +721,8 @@ async function loadCurrentDayTransactions() {
                 const tipo = transaccion.tipo;
                 const tipoClass = tipo === "entrada" ? "income" : "expense";
                 const tipoTexto = tipo.charAt(0).toUpperCase() + tipo.slice(1);
-                const capital = transaccion.monto_total - transaccion.monto_ganancia;
+                const perdida = Number(transaccion.monto_perdida || 0);
+                const capital = transaccion.monto_total - transaccion.monto_ganancia + perdida;
 
                 return `
                     <tr>
@@ -577,8 +732,9 @@ async function loadCurrentDayTransactions() {
                         <td>${transaccion.categoria}</td>
                         <td class="${tipoClass}">S/ ${transaccion.monto_total}</td>
                         <td class="${tipoClass}">S/ ${transaccion.monto_ganancia}</td>
+                        <td class="${perdida > 0 ? 'expense' : tipoClass}">S/ ${perdida}</td>
                         <td class="${tipoClass}">S/ ${capital}</td>
-                        <td>${escapeHtml(usuarioNombre || 'N/A')}</td>
+                        <td>${escapeHtml(transaccion.nombreUsuario || data.usuario || 'N/A')}</td>
                         <td>
                             ${transaccion.nota
                         ? `<button class="btn btn-sm btn-info note-btn" data-nota="${escapeHtml(transaccion.nota)}" title="Ver nota">
@@ -587,18 +743,25 @@ async function loadCurrentDayTransactions() {
                         : ""}
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-primary"
-                                data-id="${transaccion.id}"
-                                data-nota="${escapeHtml(transaccion.nota || '')}">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <form action="/cashflow/eliminar-transaccion" method="POST" style="display:inline;" 
-                                onsubmit="return confirm('¿Está seguro que desea eliminar esta transacción?');">
-                                <input type="hidden" name="id" value="${transaccion.id}">
-                                <button type="submit" class="btn btn-sm btn-danger">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </form>
+                            ${(() => {
+                                const esRecogidaOVenta = transaccion.tipo === 'entrada' && (transaccion.categoria === 'empenio' || transaccion.categoria === 'venta');
+                                const isAdmin = window.isAdminUser;
+                                let html = `<button class="btn btn-sm btn-primary"
+                                    data-id="${transaccion.id}"
+                                    data-nota="${escapeHtml(transaccion.nota || '')}">
+                                    <i class="fas fa-edit"></i>
+                                </button>`;
+                                if (!esRecogidaOVenta || isAdmin) {
+                                    html += `<form action="/cashflow/anular-transaccion" method="POST" style="display:inline;" 
+                                        onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
+                                        <input type="hidden" name="id" value="${transaccion.id}">
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>`;
+                                }
+                                return html;
+                            })()}
                         </td>
                     </tr>
                 `;
@@ -608,39 +771,40 @@ async function loadCurrentDayTransactions() {
         console.error("Error al cargar transacciones del día actual:", error);
         const tbody = document.getElementById("currentDayTransactionsBody");
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger">Error al cargar las transacciones</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger">Error al cargar las transacciones</td></tr>';
         }
         window.currentDayTransactions = [];
     }
 }
 
-function calculateDaySummary() {
-    const input = document.getElementById("initialCapitalInput");
+async function calculateDaySummary() {
     const resultEl = document.getElementById("daySummaryResult");
-    if (!input || !resultEl) return;
+    if (!resultEl) return;
 
-    const initial = parseFloat(input.value || "0");
-    const transacciones = Array.isArray(window.currentDayTransactions) ? window.currentDayTransactions : [];
-
-    let capital = initial;
-    let ganancia = 0;
-
-    transacciones.forEach((tx) => {
-        const montoTotal = Number(tx.monto_total) || 0;
-        const montoGanancia = Number(tx.monto_ganancia) || 0;
-        const esEntrada = tx.tipo === "entrada";
-
-        if (esEntrada) {
-            capital += montoTotal - montoGanancia;
-            ganancia += montoGanancia;
-        } else {
-            capital -= montoTotal;
-        }
-    });
-
-    resultEl.classList.remove("d-none", "alert-danger");
+    resultEl.classList.remove("d-none", "alert-danger", "alert-success");
     resultEl.classList.add("alert-info");
-    resultEl.textContent = `Capital: S/ ${capital.toFixed(2)} | Ganancia: S/ ${ganancia.toFixed(2)}`;
+    resultEl.textContent = "Calculando resumen del dia...";
+
+    try {
+        const resp = await fetch("/cashflow/resumen-dia");
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            throw new Error(data.error || "No se pudo obtener el resumen del dia.");
+        }
+
+        const capitalFinal = Number(data.capital_final || 0).toFixed(2);
+        const gananciaDia = Number(data.ganancia_dia || 0).toFixed(2);
+        const saldoFinal = Number(data.saldo_final || 0).toFixed(2);
+
+        resultEl.classList.remove("alert-danger");
+        resultEl.classList.add("alert-info");
+        resultEl.textContent = `Capital: S/ ${capitalFinal} | Ganancia: S/ ${gananciaDia} | Saldo final: S/ ${saldoFinal}`;
+    } catch (err) {
+        resultEl.classList.remove("alert-info");
+        resultEl.classList.add("alert-danger");
+        resultEl.textContent = err.message;
+    }
 }
 
 function setupCerrarCajaButton() {
@@ -683,7 +847,6 @@ async function loadCurrentMonthTransactions() {
         const response = await fetch("/cashflow/transacciones-mes-actual");
         const data = await response.json();
         const transacciones = data.transacciones || [];
-        const usuarioNombre = data.usuario || '';
         const tbody = document.getElementById("currentMonthTransactionsBody");
 
         // Si la tabla de transacciones del mes actual no existe en esta página, no hacer nada
@@ -693,7 +856,7 @@ async function loadCurrentMonthTransactions() {
 
         if (transacciones.length === 0) {
             tbody.innerHTML =
-                '<tr><td colspan="10" class="text-center">No hay transacciones para el mes actual</td></tr>';
+                '<tr><td colspan="11" class="text-center">No hay transacciones para el mes actual</td></tr>';
             return;
         }
         console.log("Transacciones del mes actual:", transacciones);
@@ -704,7 +867,8 @@ async function loadCurrentMonthTransactions() {
                 const tipo = transaccion.tipo;
                 const tipoClass = tipo === "entrada" ? "income" : "expense";
                 const tipoTexto = tipo.charAt(0).toUpperCase() + tipo.slice(1);
-                const capital = transaccion.monto_total - transaccion.monto_ganancia;
+                const perdida = Number(transaccion.monto_perdida || 0);
+                const capital = transaccion.monto_total - transaccion.monto_ganancia + perdida;
 
                 return `
                                     <tr>
@@ -714,8 +878,9 @@ async function loadCurrentMonthTransactions() {
                                         <td>${transaccion.categoria}</td>
                                         <td class="${tipoClass}">S/ ${transaccion.monto_total}</td>
                                         <td class="${tipoClass}">S/ ${transaccion.monto_ganancia}</td>
+                                        <td class="${perdida > 0 ? 'expense' : tipoClass}">S/ ${perdida}</td>
                                         <td class="${tipoClass}">S/ ${capital}</td>
-                                        <td>${escapeHtml(usuarioNombre || 'N/A')}</td>
+                                        <td>${escapeHtml(transaccion.nombreUsuario || data.usuario || 'N/A')}</td>
                                         <td>
                                             ${transaccion.nota
                         ? `<button class="btn btn-sm btn-info note-btn" data-nota="${escapeHtml(transaccion.nota)}" title="Ver nota">
@@ -730,8 +895,8 @@ async function loadCurrentMonthTransactions() {
                                                 data-nota="${escapeHtml(transaccion.nota || '')}">
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <form action="/cashflow/eliminar-transaccion" method="POST" style="display:inline;" 
-                                                onsubmit="return confirm('¿Está seguro que desea eliminar esta transacción?');">
+                                            <form action="/cashflow/anular-transaccion" method="POST" style="display:inline;" 
+                                                onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
                                                 <input type="hidden" name="id" value="${transaccion.id}">
                                                 <button type="submit" class="btn btn-sm btn-danger">
                                                     <i class="fas fa-trash"></i>
@@ -747,7 +912,7 @@ async function loadCurrentMonthTransactions() {
         const tbody = document.getElementById("currentMonthTransactionsBody");
         if (tbody) {
             tbody.innerHTML =
-                '<tr><td colspan="10" class="text-center text-danger">Error al cargar las transacciones</td></tr>';
+                '<tr><td colspan="11" class="text-center text-danger">Error al cargar las transacciones</td></tr>';
         }
     }
 }

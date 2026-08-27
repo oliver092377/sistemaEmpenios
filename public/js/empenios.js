@@ -1,21 +1,3 @@
-// Obtiene el propietario actual
-var propietarioActual = "<%= propietario %>";
-
-// Lista de posibles propietarios
-var propietarios = ["Tienda", "Orlando", "Oscar", "Oliver"];
-
-// Filtrar para evitar repetidos
-var opcionesFiltradas = propietarios.filter(p => p !== propietarioActual);
-
-// Insertar las opciones en el select
-var select = document.getElementById("propietario");
-opcionesFiltradas.forEach(propietario => {
-    var option = document.createElement("option");
-    option.value = propietario;
-    option.textContent = propietario;
-    select.appendChild(option);
-});
-
 // Colorear filas según estado
 document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("tbody tr").forEach(row => {

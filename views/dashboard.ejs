@@ -1,46 +1,100 @@
-<%- include('partials/header', {title: 'Flujo de Caja - Sistema de Empeños', currentPage: 'dashboard'}) %>
+<%- include('partials/header', {title: 'Flujo de Caja - Sistema de Empeños' , currentPage: 'dashboard' }) %>
 
-<%- include('partials/sidebar', {currentPage: 'dashboard'}) %>
+    <%- include('partials/sidebar', {currentPage: 'dashboard' }) %>
 
-<div class="main-content">
-    <!-- Page Heading -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 text-gray-800">Dashboard</h1>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-            <i class="fas fa-plus me-2"></i>Nueva Transacción
-        </button>
-    </div>
+        <div class="main-content">
+            <% const moneyFormatter=new Intl.NumberFormat('es-PE', { style: 'currency' , currency: 'PEN' ,
+                minimumFractionDigits: 2, maximumFractionDigits: 2 }); %>
 
-    <!-- Contenido específico de la página de flujo de caja -->
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-primary">Registrar Transacción</h6>
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <div>
+                        <h1 class="h3 text-gray-800 mb-1">Dashboard</h1>
+                        <% if (isAdmin && dashboardData) { %>
+                            <p class="text-muted mb-0">Resumen financiero de <strong>
+                                    <%= dashboardData.empresaNombre %>
+                                </strong></p>
+                            <% } else { %>
+                                <p class="text-muted mb-0">Vista general del sistema</p>
+                                <% } %>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <!-- Formulario de transacción -->
-                    <form>
-                        <!-- Campos del formulario -->
-                    </form>
-                </div>
-            </div>
+
+                <% if (isAdmin && dashboardData) { %>
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-4">
+                            <div class="card dashboard-card bg-primary-card h-100">
+                                <div class="card-body">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Capital total
+                                    </div>
+                                    <div class="h4 mb-0 text-gray-800">
+                                        <%= moneyFormatter.format(dashboardData.capitalTotal) %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card dashboard-card bg-warning-card h-100">
+                                <div class="card-body">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Dinero
+                                        empleado en préstamos</div>
+                                    <div class="h4 mb-0 text-gray-800">
+                                        <%= moneyFormatter.format(dashboardData.dineroEmpleado) %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card dashboard-card bg-success-card h-100">
+                                <div class="card-body">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Saldo
+                                        disponible</div>
+                                    <div class="h4 mb-0 text-gray-800">
+                                        <%= moneyFormatter.format(dashboardData.saldoDisponible) %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="dashboard-data" data-dashboard='<%- JSON.stringify(dashboardData || null) %>'>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-lg-8 mx-auto">
+                            <div class="card shadow mb-4">
+                                <div
+                                    class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <h6 class="m-0 font-weight-bold text-primary">Distribución del capital</h6>
+                                    <small class="text-muted">Saldo disponible = Capital - dinero empleado en
+                                        préstamos</small>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container" style="height: 340px;">
+                                        <canvas id="capitalDistributionChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <% } else { %>
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <div class="card shadow">
+                                    <div class="card-body p-4">
+                                        <div class="alert alert-warning mb-0">
+                                            Solo el usuario administrador puede ver el capital de la empresa, el dinero
+                                            empleado en préstamos y el saldo disponible.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <% } %>
         </div>
-    </div>
 
-    <!-- Más contenido específico -->
-</div>
+        <%- include('partials/footer') %>
 
-<%- include('partials/footer') %>
 
-<%- include('partials/scripts', {currentPage: 'cashflow'}) %>
-    <script>
-        // Scripts específicos para la página de flujo de caja
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Página de flujo de caja cargada');
-            // Aquí tu código JavaScript específico para esta página
-        });
-        console.log("funciona");
-    </script>
-</body>
-</html>
+            <%- include('partials/scripts', {currentPage: 'dashboard' }) %>
+                </body>
+
+                </html>
