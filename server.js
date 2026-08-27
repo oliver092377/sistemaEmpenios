@@ -39,11 +39,11 @@ async function ensureFechaInicioSistemaColumn() {
 // Configuración de sesión para manejo de login
 const MySQLStore = MySQLStoreFactory(session);
 const sessionStore = new MySQLStore({
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '1234',
-  database: process.env.DB_NAME || 'mydb',
+  host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
+  port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
+  user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+  password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '1234',
+  database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'mydb',
   createDatabaseTable: true,
 });
 

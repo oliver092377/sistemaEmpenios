@@ -183,6 +183,61 @@ npm start
 
 Actualmente no hay una suite de pruebas automatizadas configurada. La orden `npm test` permanece como marcador y termina con error hasta que se incorporen pruebas.
 
+## Despliegue en Railway
+
+El proyecto incluye `railway.toml` y está preparado para desplegarse como un servicio Node.js en Railway.
+
+### 1. Crear el proyecto
+
+1. Crear un proyecto en [Railway](https://railway.com/).
+2. Agregar un servicio **MySQL**.
+3. Agregar el repositorio GitHub como servicio de aplicación.
+4. Railway detectará Node.js y ejecutará `npm start`.
+
+### 2. Configurar variables
+
+En el servicio de la aplicación, crear estas variables. Si el servicio MySQL tiene otro nombre, reemplazar `MySQL` en las referencias:
+
+```text
+DB_HOST=${{MySQL.MYSQLHOST}}
+DB_PORT=${{MySQL.MYSQLPORT}}
+DB_USER=${{MySQL.MYSQLUSER}}
+DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
+DB_NAME=${{MySQL.MYSQLDATABASE}}
+SESSION_SECRET=un-secreto-largo-y-aleatorio
+```
+
+Railway proporciona `PORT` automáticamente. La aplicación escucha en `0.0.0.0` y utiliza ese puerto.
+
+### 3. Importar la base de datos local
+
+Exportar la base de datos local:
+
+```bash
+mysqldump -u root -p mydb > backup.sql
+```
+
+En Railway, copiar las credenciales del servicio MySQL y ejecutar desde un equipo que tenga el cliente MySQL instalado:
+
+```bash
+mysql -h HOST_RAILWAY -P PUERTO_RAILWAY -u USUARIO_RAILWAY -p NOMBRE_BD_RAILWAY < backup.sql
+```
+
+No subir `backup.sql` al repositorio si contiene información real. La aplicación incluye migraciones automáticas para algunas columnas, pero no reemplaza el respaldo o la migración inicial de las tablas y datos existentes.
+
+### 4. Publicar y comprobar
+
+Después del deploy, generar un dominio público desde Railway y comprobar:
+
+- Inicio de sesión.
+- Dashboard y selección de empresa.
+- Registro y consulta de empeños.
+- Registro de transacciones e intereses.
+- Cierre de caja y reportes.
+- Persistencia de sesión después de reiniciar el servicio.
+
+Para producción, usar un `SESSION_SECRET` nuevo y no reutilizar las credenciales locales del archivo `.env`.
+
 ## Seguridad
 
 - No subir `.env` al repositorio.
