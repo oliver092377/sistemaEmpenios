@@ -14,7 +14,7 @@ async function ensureTransaccionesLossColumn() {
                 `SELECT COUNT(*) AS total
                    FROM INFORMATION_SCHEMA.COLUMNS
                   WHERE TABLE_SCHEMA = DATABASE()
-                    AND TABLE_NAME = 'transacciones'
+                    AND TABLE_NAME = 'Transacciones'
                     AND COLUMN_NAME = 'monto_perdida'`
             );
 
