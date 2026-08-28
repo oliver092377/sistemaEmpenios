@@ -20,7 +20,7 @@ async function ensureTransaccionesLossColumn() {
 
             if (!rows[0]?.total) {
                 await pool.query(
-                    'ALTER TABLE transacciones ADD COLUMN monto_perdida DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER monto_ganancia'
+                    'ALTER TABLE Transacciones ADD COLUMN monto_perdida DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER monto_ganancia'
                 );
             }
         })();
@@ -62,13 +62,13 @@ async function ensureTransaccionesEstadoColumn() {
                 `SELECT COUNT(*) AS total
                    FROM INFORMATION_SCHEMA.COLUMNS
                   WHERE TABLE_SCHEMA = DATABASE()
-                    AND TABLE_NAME = 'transacciones'
+                    AND TABLE_NAME = 'Transacciones'
                     AND COLUMN_NAME = 'estado'`
             );
 
             if (!rows[0]?.total) {
                 await pool.query(
-                    "ALTER TABLE transacciones ADD COLUMN estado ENUM('activa','anulada') NOT NULL DEFAULT 'activa' AFTER id_empenio"
+                    "ALTER TABLE Transacciones ADD COLUMN estado ENUM('activa','anulada') NOT NULL DEFAULT 'activa' AFTER id_empenio"
                 );
             }
         })();
@@ -259,7 +259,7 @@ router.post('/guardar-transaccion', async (req, res) => {
         await connection.beginTransaction();
 
         await connection.execute(
-            'INSERT INTO transacciones (tipo, monto_total, monto_ganancia, monto_perdida, descripcion, categoria, fecha, usuarioId, empresaId, nota, id_empenio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Transacciones (tipo, monto_total, monto_ganancia, monto_perdida, descripcion, categoria, fecha, usuarioId, empresaId, nota, id_empenio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 tipo,
                 monto,
@@ -315,7 +315,7 @@ router.post('/editar-transaccion', async (req, res) => {
         await ensureTransaccionesLossColumn();
 
         const [currentRows] = await pool.execute(
-            'SELECT empresaId, COALESCE(monto_perdida, 0) AS monto_perdida FROM transacciones WHERE id = ? LIMIT 1',
+            'SELECT empresaId, COALESCE(monto_perdida, 0) AS monto_perdida FROM Transacciones WHERE id = ? LIMIT 1',
             [id]
         );
 
@@ -336,7 +336,7 @@ router.post('/editar-transaccion', async (req, res) => {
             await connection.beginTransaction();
 
             await connection.execute(
-                'UPDATE transacciones SET tipo = ?, categoria = ?, monto_total = ?, monto_ganancia = ?, monto_perdida = ?, descripcion = ?, fecha = ?, nota = ? WHERE id = ?',
+                'UPDATE Transacciones SET tipo = ?, categoria = ?, monto_total = ?, monto_ganancia = ?, monto_perdida = ?, descripcion = ?, fecha = ?, nota = ? WHERE id = ?',
                 [tipo, categoria, monto, montoGanancia, montoPerdida, descripcion, fecha, nota || null, id]
             );
 
@@ -398,7 +398,7 @@ router.post('/cierre-caja', async (req, res) => {
                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN monto_ganancia ELSE 0 END), 0) AS ganancia_dia,
                                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN COALESCE(monto_perdida, 0) ELSE 0 END), 0) AS perdida_dia,
                                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN (monto_total - monto_ganancia - COALESCE(monto_perdida, 0)) ELSE -monto_total END), 0) AS delta_capital
-              FROM transacciones
+              FROM Transacciones
               WHERE empresaId = ? AND DATE(fecha) = ? AND estado = 'activa'`,
             [empresaId, hoy]
         );
@@ -468,7 +468,7 @@ router.get('/resumen-dia', async (req, res) => {
                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN monto_ganancia ELSE 0 END), 0) AS ganancia_dia,
                                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN COALESCE(monto_perdida, 0) ELSE 0 END), 0) AS perdida_dia,
                                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN (monto_total - monto_ganancia ) ELSE -monto_total END), 0) AS delta_capital
-              FROM transacciones
+              FROM Transacciones
               WHERE empresaId = ? AND DATE(fecha) = ? AND estado = 'activa'`,
             [empresaId, hoy]
         );
