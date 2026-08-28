@@ -11,13 +11,13 @@ async function ensureTransaccionesLossColumn() {
         `SELECT COUNT(*) AS total
            FROM INFORMATION_SCHEMA.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE()
-            AND TABLE_NAME = 'transacciones'
+            AND TABLE_NAME = 'Transacciones'
             AND COLUMN_NAME = 'monto_perdida'`
       );
 
       if (!rows[0]?.total) {
         await pool.query(
-          'ALTER TABLE transacciones ADD COLUMN monto_perdida DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER monto_ganancia'
+          'ALTER TABLE Transacciones ADD COLUMN monto_perdida DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER monto_ganancia'
         );
       }
     })();
@@ -35,12 +35,12 @@ async function ensureTransaccionesEstadoColumn() {
         `SELECT COUNT(*) AS total
            FROM INFORMATION_SCHEMA.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE()
-            AND TABLE_NAME = 'transacciones'
+            AND TABLE_NAME = 'Transacciones'
             AND COLUMN_NAME = 'estado'`
       );
       if (!rows[0]?.total) {
         await pool.query(
-          "ALTER TABLE transacciones ADD COLUMN estado ENUM('activa','anulada') NOT NULL DEFAULT 'activa' AFTER id_empenio"
+          "ALTER TABLE Transacciones ADD COLUMN estado ENUM('activa','anulada') NOT NULL DEFAULT 'activa' AFTER id_empenio"
         );
       }
     })();
@@ -210,7 +210,7 @@ app.post('/:id/interes', async (req, res) => {
     await ensureTransaccionesEstadoColumn();
 
     await pool.execute(
-      `INSERT INTO transacciones
+      `INSERT INTO Transacciones
         (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, id_empenio, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ['entrada', 'interes', monto, 0, 0, descripcion, fecha, req.session.user.id, req.session.user.empresaId, id, 'activa']
@@ -244,7 +244,7 @@ app.put('/:id/interes', async (req, res) => {
 
     const [matchRows] = await pool.execute(
       `SELECT id
-         FROM transacciones
+         FROM Transacciones
         WHERE id_empenio = ?
           AND categoria = 'interes'
           AND DATE(fecha) = ?
@@ -260,7 +260,7 @@ app.put('/:id/interes', async (req, res) => {
     }
 
     const [result] = await pool.execute(
-      `UPDATE transacciones
+      `UPDATE Transacciones
           SET fecha = ?, monto_total = ?, descripcion = ?
         WHERE id = ?`,
       [fecha, monto, descripcion, matchRows[0].id]
@@ -298,7 +298,7 @@ app.delete('/:id/interes', async (req, res) => {
 
     const [matchRows] = await pool.execute(
       `SELECT id
-         FROM transacciones
+         FROM Transacciones
         WHERE id_empenio = ?
           AND categoria = 'interes'
           AND DATE(fecha) = ?
@@ -314,7 +314,7 @@ app.delete('/:id/interes', async (req, res) => {
     }
 
     const [result] = await pool.execute(
-      "UPDATE transacciones SET estado = 'anulada' WHERE id = ?",
+      "UPDATE Transacciones SET estado = 'anulada' WHERE id = ?",
       [matchRows[0].id]
     );
 
@@ -345,7 +345,7 @@ app.get('/:id/detalle', async (req, res) => {
           DATE(fecha) AS Fecha,
           monto_total AS Monto,
           descripcion AS Descripcion
-         FROM transacciones
+         FROM Transacciones
         WHERE id_empenio = ?
           AND categoria = 'interes'
         ORDER BY fecha ASC, id ASC`,
@@ -377,28 +377,28 @@ app.get('/totales', async (req, res) => {
     await ensureTransaccionesLossColumn();
     const [capital] = await pool.query(`
       SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total - monto_ganancia - COALESCE(monto_perdida, 0)) AS capital
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "entrada" AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
     const [ganancias] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_ganancia) AS ganancias
-            FROM transacciones
+            FROM Transacciones
             WHERE estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
     const [entradas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS entradas
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "entrada" AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `);
     const [salidas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS salidas
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "salida" AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
@@ -437,7 +437,7 @@ app.post('/guardar-empenio-con-transaccion', async (req, res) => {
     const empenioId = resultEmp.insertId;
 
     await connection.execute(
-      `INSERT INTO transacciones (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, nota, id_empenio, estado)
+      `INSERT INTO Transacciones (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, nota, id_empenio, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ['salida', 'prestamo', monto_prestamo, 0, 0, descripcion_prestamo || '', fecha_prestamo, req.session.user.id, req.session.user.empresaId, nota || null, empenioId, 'activa']
     );
