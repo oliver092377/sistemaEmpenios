@@ -506,7 +506,7 @@ router.post('/anular-transaccion', async (req, res) => {
         await ensureTransaccionesLossColumn();
         await ensureTransaccionesEstadoColumn();
         const [rows] = await pool.execute(
-            'SELECT * FROM transacciones WHERE id = ? LIMIT 1',
+            'SELECT * FROM Transacciones WHERE id = ? LIMIT 1',
             [id]
         );
 
@@ -527,7 +527,7 @@ router.post('/anular-transaccion', async (req, res) => {
 
             if (esPrestamo && transaccion.id_empenio) {
                 const [otrasOps] = await connection.execute(
-                    `SELECT COUNT(*) AS total FROM transacciones
+                    `SELECT COUNT(*) AS total FROM Transacciones
                      WHERE id_empenio = ? AND id != ? AND estado = 'activa'`,
                     [transaccion.id_empenio, id]
                 );
@@ -544,7 +544,7 @@ router.post('/anular-transaccion', async (req, res) => {
             }
 
             await connection.execute(
-                "UPDATE transacciones SET estado = 'anulada' WHERE id = ?",
+                "UPDATE Transacciones SET estado = 'anulada' WHERE id = ?",
                 [id]
             );
 
