@@ -572,7 +572,7 @@ router.get('/totales', async (req, res) => {
         const empresaId = req.session.user.empresaId;
 
         const [yearsRows] = await pool.query(
-            'SELECT DISTINCT YEAR(fecha) AS year FROM transacciones WHERE empresaId = ? ORDER BY year ASC',
+            'SELECT DISTINCT YEAR(fecha) AS year FROM Transacciones WHERE empresaId = ? ORDER BY year ASC',
             [empresaId]
         );
         const years = yearsRows.map((r) => r.year);
@@ -587,35 +587,35 @@ router.get('/totales', async (req, res) => {
 
         const [capital] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total - monto_ganancia - COALESCE(monto_perdida, 0)) AS capital
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "entrada" AND empresaId = ? AND YEAR(fecha) = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `, [empresaId, selectedYear]);
         const [ganancias] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_ganancia) AS ganancias
-            FROM transacciones
+            FROM Transacciones
             WHERE empresaId = ? AND YEAR(fecha) = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `, [empresaId, selectedYear]);
         const [perdidas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_perdida) AS perdidas
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "entrada" AND empresaId = ? AND YEAR(fecha) = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `, [empresaId, selectedYear]);
         const [entradas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS entradas
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "entrada" AND empresaId = ? AND YEAR(fecha) = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
         `, [empresaId, selectedYear]);
         const [salidas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS salidas
-            FROM transacciones
+            FROM Transacciones
             WHERE tipo = "salida" AND empresaId = ? AND YEAR(fecha) = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
