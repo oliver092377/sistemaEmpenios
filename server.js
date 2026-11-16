@@ -75,15 +75,25 @@ app.use(
 );
 
 app.use((req, res, next) => {
+  const validateCsrf = () => {
+    const stateChangingMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+    const suppliedToken = req.get('x-csrf-token') || req.body?.csrfToken;
+    if (stateChangingMethod && suppliedToken !== req.session.csrfToken) {
+      return res.status(403).send('Solicitud no autorizada.');
+    }
+    next();
+  };
+
   if (!req.session.csrfToken) {
     req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    return req.session.save((error) => {
+      if (error) {
+        return next(error);
+      }
+      validateCsrf();
+    });
   }
-  const stateChangingMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
-  const suppliedToken = req.get('x-csrf-token') || req.body?.csrfToken;
-  if (stateChangingMethod && suppliedToken !== req.session.csrfToken) {
-    return res.status(403).send('Solicitud no autorizada.');
-  }
-  next();
+  validateCsrf();
 });
 
 // Hacer disponible el usuario logueado en todas las vistas EJS
