@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import session from 'express-session';
 import MySQLStoreFactory from 'express-mysql-session';
 import bcrypt from 'bcryptjs';
@@ -9,13 +10,20 @@ import cashflowRouter from './routes/cashflow.js';
 import empenioRouter from './routes/empenio.js';
 
 dotenv.config({ quiet: true });
+process.env.TZ = process.env.TZ || 'America/Lima';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const sessionSecret = process.env.SESSION_SECRET || 'empenios_app_secret_key';
+
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET es obligatorio en producción.');
+}
 
 app.use(express.urlencoded({ extended: true })); // Para datos de formularios
 app.use(express.json()); // Para datos en formato JSON
 app.use(express.static('public'));
+app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
 async function ensureFechaInicioSistemaColumn() {
     try {
@@ -49,16 +57,35 @@ const sessionStore = new MySQLStore({
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'empenios_app_secret_key',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     store: sessionStore,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 1000 * 60 * 60 * 8
+    }
   })
 );
+
+app.use((req, res, next) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+  }
+  const stateChangingMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  const suppliedToken = req.get('x-csrf-token') || req.body?.csrfToken;
+  if (stateChangingMethod && suppliedToken !== req.session.csrfToken) {
+    return res.status(403).send('Solicitud no autorizada.');
+  }
+  next();
+});
 
 // Hacer disponible el usuario logueado en todas las vistas EJS
 app.use((req, res, next) => {
   res.locals.user = req.session?.user || null;
+  res.locals.csrfToken = req.session?.csrfToken || '';
   next();
 });
 
@@ -121,17 +148,21 @@ app.post('/login', async (req, res) => {
     }
 
     // Guardar datos mínimos en sesión
-    req.session.user = {
-      id: user.id,
-      username: user.username,
-      rol: user.rol,
-      nombre: user.nombre,
-      empresaId: user.empresaId,
-      isAdminUser: isAdminUser({ session: { user } })
-      
-    };
-
-    return res.redirect('/dashboard');
+     req.session.regenerate((sessionError) => {
+       if (sessionError) {
+         console.error('Error al regenerar la sesión:', sessionError);
+         return res.status(500).send('Error en la sesión');
+       }
+       req.session.user = {
+         id: user.id,
+         username: user.username,
+         rol: user.rol,
+         nombre: user.nombre,
+         empresaId: user.empresaId,
+         isAdminUser: isAdminUser({ session: { user } })
+       };
+       return req.session.save(() => res.redirect('/dashboard'));
+     });
   } catch (error) {
     console.error('Error en el proceso de login:', error);
     return res.status(500).send('Error en el servidor durante el login');
@@ -247,6 +278,10 @@ app.post('/settings/caja', requireAuth, async (req, res) => {
     ? null
     : parseFloat(saldo_inicial_manual);
 
+  if (saldoInicial !== null && (!Number.isFinite(saldoInicial) || saldoInicial < 0)) {
+    return res.redirect('/settings?error=1');
+  }
+
   const autorizado = cierre_autorizado ? 1 : 0;
   const fechaInicio = fecha_inicio_sistema || null;
 
@@ -270,7 +305,36 @@ app.post('/settings/caja', requireAuth, async (req, res) => {
 });
 
 
-// Iniciar el servidor
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+async function ensurePerformanceIndexes() {
+  const indexes = [
+    ['Empenios', 'idx_empenios_empresa_fecha', '(empresaId, Fecha)'],
+    ['Empenios', 'idx_empenios_empresa_estado', '(empresaId, Estado)'],
+    ['Transacciones', 'idx_transacciones_empresa_fecha', '(empresaId, fecha)'],
+    ['Transacciones', 'idx_transacciones_empresa_categoria', '(empresaId, categoria)'],
+    ['Transacciones', 'idx_transacciones_empenio', '(id_empenio)'],
+    ['caja_diaria', 'idx_caja_empresa_fecha', '(empresaId, fecha)']
+  ];
+
+  for (const [tableName, indexName, columns] of indexes) {
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS total
+         FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND INDEX_NAME = ?`,
+      [tableName, indexName]
+    );
+    if (!rows[0]?.total) {
+      await pool.query(`ALTER TABLE \`${tableName}\` ADD INDEX \`${indexName}\` ${columns}`);
+    }
+  }
+}
+
+// Iniciar el servidor después de comprobar las optimizaciones de base de datos.
+ensurePerformanceIndexes()
+  .catch((error) => console.error('No se pudieron crear los índices de rendimiento:', error))
+  .finally(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    });
+  });

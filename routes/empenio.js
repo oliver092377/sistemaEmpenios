@@ -89,6 +89,8 @@ app.get('/buscar', async (req, res) => {
 // Listar transacciones
 app.get('/', async (req, res) => {
   const { nombres, apellidos, artefacto, marca, fecha, monto, showAll } = req.query;
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(10, Number.parseInt(req.query.limit, 10) || 25));
 
   // Only allow showAll for admin users
   const allowShowAll = showAll === '1' && req.session.user.isAdminUser;
@@ -136,8 +138,33 @@ app.get('/', async (req, res) => {
   }
 
   try {
-    query += ' ORDER BY emp.idEmpenios DESC';
+    const countQuery = query.replace(
+      'SELECT emp.*, e.nombre AS empresaNombre',
+      'SELECT COUNT(*) AS total'
+    );
+    const [countRows] = await pool.execute(countQuery, params);
+    const total = Number(countRows[0]?.total || 0);
+    const summaryQuery = countQuery.replace(
+      'SELECT COUNT(*) AS total',
+      `SELECT
+         COALESCE(SUM(CASE WHEN LOWER(emp.Estado) = 'activo' THEN emp.Monto ELSE 0 END), 0) AS totalMontoActivos,
+         COALESCE(SUM(CASE WHEN LOWER(emp.Estado) = 'activo' THEN 1 ELSE 0 END), 0) AS totalActivos`
+    );
+    const [summaryRows] = await pool.execute(summaryQuery, params);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const currentPage = Math.min(page, totalPages);
+    query += ` ORDER BY emp.idEmpenios DESC LIMIT ${limit} OFFSET ${(currentPage - 1) * limit}`;
     const [rows] = await pool.execute(query, params);
+    const queryParams = new URLSearchParams();
+    for (const [key, value] of Object.entries({ nombres, apellidos, artefacto, marca, fecha, monto, showAll: allowShowAll ? '1' : '' })) {
+      if (value) queryParams.set(key, value);
+    }
+    queryParams.set('limit', String(limit));
+    const urlForPage = (targetPage) => {
+      const next = new URLSearchParams(queryParams);
+      next.set('page', String(targetPage));
+      return `/empenio?${next.toString()}`;
+    };
     res.render('Empe.ejs', {
       empenios: rows,
       nombres,
@@ -148,6 +175,17 @@ app.get('/', async (req, res) => {
       monto,
       currentEmpresaId: req.session.user.empresaId,
       showAll: allowShowAll,
+      pagination: {
+        page: currentPage,
+        limit,
+        total,
+        totalPages,
+        urls: Object.fromEntries(Array.from({ length: totalPages }, (_, index) => [index + 1, urlForPage(index + 1)])),
+        previousUrl: urlForPage(Math.max(1, currentPage - 1)),
+        nextUrl: urlForPage(Math.min(totalPages, currentPage + 1))
+      },
+      totalMontoActivos: Number(summaryRows[0]?.totalMontoActivos || 0),
+      totalActivos: Number(summaryRows[0]?.totalActivos || 0),
       str: ""
     });
   } catch (error) {
@@ -159,10 +197,17 @@ app.get('/', async (req, res) => {
 app.post('/actualizar-empenio/:id', async (req, res) => {
   const { id } = req.params;
   const { nombres, apellidos, artefacto, marca, fecha, monto, descripcion, estado } = req.body;
+  const montoNumerico = Number(monto);
+  const estadosValidos = ['Activo', 'Recogido', 'En venta', 'Vendido', 'Finalizado', 'Anulado'];
+  if (!nombres?.trim() || !apellidos?.trim() || !artefacto?.trim() || !marca?.trim()
+      || !fecha || !Number.isFinite(montoNumerico) || montoNumerico < 0
+      || !estadosValidos.includes(estado)) {
+    return res.status(400).send('Los datos del empeño no son válidos.');
+  }
   try {
     const [result] = await pool.query(
       'UPDATE Empenios SET Nombres_Cliente = ?, Apellidos_Cliente = ?, Artefacto = ?, Marca = ?, Fecha = ?, Monto = ?, Detalles=?, Estado=? WHERE idEmpenios = ? AND empresaId = ?',
-      [nombres, apellidos, artefacto, marca, fecha, monto, descripcion, estado, id, req.session.user.empresaId]
+      [nombres, apellidos, artefacto, marca, fecha, montoNumerico, descripcion, estado, id, req.session.user.empresaId]
     );
 
     if (result.affectedRows === 0) {
@@ -178,11 +223,16 @@ app.post('/actualizar-empenio/:id', async (req, res) => {
 
 app.post('/guardar-empenio', async (req, res) => {
   const { nombres, apellidos, artefacto, marca, fecha, monto, descripcion } = req.body;
+  const montoNumerico = Number(monto);
+  if (!nombres?.trim() || !apellidos?.trim() || !artefacto?.trim() || !marca?.trim()
+      || !fecha || !Number.isFinite(montoNumerico) || montoNumerico < 0) {
+    return res.status(400).send('Los datos del empeño no son válidos.');
+  }
 
   try {
     await pool.execute(
       'INSERT INTO Empenios (Nombres_Cliente, Apellidos_Cliente, Artefacto, Marca, Fecha, Monto, Detalles, usuarioId, empresaId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [nombres, apellidos, artefacto, marca, fecha, monto, descripcion, req.session.user.id, req.session.user.empresaId]
+      [nombres, apellidos, artefacto, marca, fecha, montoNumerico, descripcion, req.session.user.id, req.session.user.empresaId]
     );
 
     res.redirect('/cashflow'); // Redirige a la lista de transacciones después de guardar
@@ -197,6 +247,10 @@ app.post('/guardar-empenio', async (req, res) => {
 app.post('/:id/interes', async (req, res) => {
   const { id } = req.params;
   const { monto, descripcion, fecha } = req.body;
+  const montoNumerico = Number(monto);
+  if (!fecha || !Number.isFinite(montoNumerico) || montoNumerico <= 0 || !descripcion?.trim()) {
+    return res.status(400).json({ error: 'Los datos del interés no son válidos' });
+  }
 
   try {
     // Verify empeño ownership
@@ -213,7 +267,7 @@ app.post('/:id/interes', async (req, res) => {
       `INSERT INTO Transacciones
         (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, id_empenio, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['entrada', 'interes', monto, 0, 0, descripcion, fecha, req.session.user.id, req.session.user.empresaId, id, 'activa']
+      ['entrada', 'interes', montoNumerico, 0, 0, descripcion, fecha, req.session.user.id, req.session.user.empresaId, id, 'activa']
     );
 
     return res.status(201).json({ message: 'Interés agregado correctamente' });
@@ -227,8 +281,10 @@ app.post('/:id/interes', async (req, res) => {
 app.put('/:id/interes', async (req, res) => {
   const { id } = req.params;
   const { originalFecha, originalMonto, originalDescripcion, fecha, monto, descripcion } = req.body;
+  const montoNumerico = Number(monto);
 
-  if (!originalFecha || !originalMonto || !originalDescripcion) {
+  if (!originalFecha || !originalMonto || !originalDescripcion
+      || !fecha || !Number.isFinite(montoNumerico) || montoNumerico <= 0 || !descripcion?.trim()) {
     return res.status(400).json({ error: 'Datos originales del interés incompletos' });
   }
 
@@ -249,10 +305,11 @@ app.put('/:id/interes', async (req, res) => {
           AND categoria = 'interes'
           AND DATE(fecha) = ?
           AND monto_total = ?
-          AND descripcion = ?
+           AND descripcion = ?
+           AND empresaId = ?
         ORDER BY id DESC
         LIMIT 1`,
-      [id, originalFecha, originalMonto, originalDescripcion]
+      [id, originalFecha, originalMonto, originalDescripcion, req.session.user.empresaId]
     );
 
     if (matchRows.length === 0) {
@@ -262,8 +319,8 @@ app.put('/:id/interes', async (req, res) => {
     const [result] = await pool.execute(
       `UPDATE Transacciones
           SET fecha = ?, monto_total = ?, descripcion = ?
-        WHERE id = ?`,
-      [fecha, monto, descripcion, matchRows[0].id]
+         WHERE id = ? AND empresaId = ?`,
+      [fecha, montoNumerico, descripcion, matchRows[0].id, req.session.user.empresaId]
     );
 
     if (result.affectedRows === 0) {
@@ -303,10 +360,11 @@ app.delete('/:id/interes', async (req, res) => {
           AND categoria = 'interes'
           AND DATE(fecha) = ?
           AND monto_total = ?
-          AND descripcion = ?
+           AND descripcion = ?
+           AND empresaId = ?
         ORDER BY id DESC
         LIMIT 1`,
-      [id, fecha, monto, descripcion]
+      [id, fecha, monto, descripcion, req.session.user.empresaId]
     );
 
     if (matchRows.length === 0) {
@@ -314,8 +372,8 @@ app.delete('/:id/interes', async (req, res) => {
     }
 
     const [result] = await pool.execute(
-      "UPDATE Transacciones SET estado = 'anulada' WHERE id = ?",
-      [matchRows[0].id]
+      "UPDATE Transacciones SET estado = 'anulada' WHERE id = ? AND empresaId = ?",
+      [matchRows[0].id, req.session.user.empresaId]
     );
 
     if (result.affectedRows === 0) {
@@ -337,8 +395,8 @@ app.get('/:id/detalle', async (req, res) => {
       `SELECT emp.*, e.nombre AS empresaNombre
          FROM Empenios emp
     LEFT JOIN empresa e ON e.id = emp.empresaId
-        WHERE emp.idEmpenios = ?`,
-      [id]
+        WHERE emp.idEmpenios = ? AND emp.empresaId = ?`,
+      [id, req.session.user.empresaId]
     );
     const [interesesData] = await pool.execute(
       `SELECT
@@ -346,10 +404,10 @@ app.get('/:id/detalle', async (req, res) => {
           monto_total AS Monto,
           descripcion AS Descripcion
          FROM Transacciones
-        WHERE id_empenio = ?
+        WHERE id_empenio = ? AND empresaId = ?
           AND categoria = 'interes'
         ORDER BY fecha ASC, id ASC`,
-      [id]
+      [id, req.session.user.empresaId]
     );
 
     if (empenioData.length === 0) {
@@ -378,31 +436,31 @@ app.get('/totales', async (req, res) => {
     const [capital] = await pool.query(`
       SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total - monto_ganancia - COALESCE(monto_perdida, 0)) AS capital
             FROM Transacciones
-            WHERE tipo = "entrada" AND estado = 'activa'
+            WHERE tipo = "entrada" AND empresaId = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
-        `);
+        `, [req.session.user.empresaId]);
     const [ganancias] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_ganancia) AS ganancias
             FROM Transacciones
-            WHERE estado = 'activa'
+            WHERE empresaId = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
-        `);
+        `, [req.session.user.empresaId]);
     const [entradas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS entradas
             FROM Transacciones
-            WHERE tipo = "entrada" AND estado = 'activa'
+            WHERE tipo = "entrada" AND empresaId = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
-        `);
+        `, [req.session.user.empresaId]);
     const [salidas] = await pool.query(`
             SELECT YEAR(fecha) as year, MONTH(fecha) as month, SUM(monto_total) AS salidas
             FROM Transacciones
-            WHERE tipo = "salida" AND estado = 'activa'
+            WHERE tipo = "salida" AND empresaId = ? AND estado = 'activa'
             GROUP BY YEAR(fecha), MONTH(fecha)
             ORDER BY YEAR(fecha), MONTH(fecha)
-        `);
+        `, [req.session.user.empresaId]);
 
     res.json({
       capital,
@@ -422,6 +480,14 @@ app.post('/guardar-empenio-con-transaccion', async (req, res) => {
     nombres, apellidos, artefacto, marca, fecha_empenio, monto_empenio, descripcion_empenio,
     monto_prestamo, fecha_prestamo, descripcion_prestamo, nota
   } = req.body;
+  const montoEmpenioNumerico = Number(monto_empenio);
+  const montoPrestamoNumerico = Number(monto_prestamo);
+  if (!nombres?.trim() || !apellidos?.trim() || !artefacto?.trim() || !marca?.trim()
+      || !fecha_empenio || !fecha_prestamo
+      || !Number.isFinite(montoEmpenioNumerico) || montoEmpenioNumerico < 0
+      || !Number.isFinite(montoPrestamoNumerico) || montoPrestamoNumerico < 0) {
+    return res.status(400).send('Los datos del empeño y préstamo no son válidos.');
+  }
 
   const connection = await pool.getConnection();
   try {
@@ -431,7 +497,7 @@ app.post('/guardar-empenio-con-transaccion', async (req, res) => {
 
     const [resultEmp] = await connection.execute(
       'INSERT INTO Empenios (Nombres_Cliente, Apellidos_Cliente, Artefacto, Marca, Fecha, Monto, Detalles, Estado, usuarioId, empresaId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [nombres, apellidos, artefacto, marca, fecha_empenio, monto_empenio, descripcion_empenio || '', 'Activo', req.session.user.id, req.session.user.empresaId]
+      [nombres, apellidos, artefacto, marca, fecha_empenio, montoEmpenioNumerico, descripcion_empenio || '', 'Activo', req.session.user.id, req.session.user.empresaId]
     );
 
     const empenioId = resultEmp.insertId;
@@ -439,7 +505,7 @@ app.post('/guardar-empenio-con-transaccion', async (req, res) => {
     await connection.execute(
       `INSERT INTO Transacciones (tipo, categoria, monto_total, monto_ganancia, monto_perdida, descripcion, fecha, usuarioId, empresaId, nota, id_empenio, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['salida', 'prestamo', monto_prestamo, 0, 0, descripcion_prestamo || '', fecha_prestamo, req.session.user.id, req.session.user.empresaId, nota || null, empenioId, 'activa']
+      ['salida', 'prestamo', montoPrestamoNumerico, 0, 0, descripcion_prestamo || '', fecha_prestamo, req.session.user.id, req.session.user.empresaId, nota || null, empenioId, 'activa']
     );
 
     await connection.commit();

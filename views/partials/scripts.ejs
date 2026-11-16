@@ -6,11 +6,36 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         var toggleBtn = document.getElementById('sidebarToggle');
+        var sidebar = document.getElementById('appSidebar');
         if (toggleBtn) {
             toggleBtn.addEventListener('click', function () {
-                document.body.classList.toggle('sidebar-collapsed');
+                var open;
+                if (window.innerWidth < 768) {
+                    document.body.classList.remove('sidebar-collapsed');
+                    open = document.body.classList.toggle('sidebar-open');
+                } else {
+                    var collapsed = document.body.classList.toggle('sidebar-collapsed');
+                    open = !collapsed;
+                }
+                toggleBtn.setAttribute('aria-expanded', String(open));
             });
         }
+        document.addEventListener('click', function (event) {
+            if (window.innerWidth < 768 && document.body.classList.contains('sidebar-open')
+                && sidebar && !sidebar.contains(event.target) && !toggleBtn.contains(event.target)) {
+                document.body.classList.remove('sidebar-open');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 768) {
+                document.body.classList.remove('sidebar-open');
+                document.body.classList.remove('sidebar-collapsed');
+                toggleBtn?.setAttribute('aria-expanded', 'false');
+            } else {
+                document.body.classList.remove('sidebar-collapsed');
+            }
+        });
     });
 </script>
 <!-- Scripts específicos de la página -->

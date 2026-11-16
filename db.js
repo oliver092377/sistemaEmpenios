@@ -2,6 +2,7 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
+process.env.TZ = process.env.TZ || 'America/Lima';
 
 export const pool = mysql.createPool({
   host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
@@ -9,6 +10,7 @@ export const pool = mysql.createPool({
   port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
   password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '1234',
   database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'mydb',
+  timezone: process.env.DB_TIMEZONE || '-05:00',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

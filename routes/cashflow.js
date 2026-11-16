@@ -5,6 +5,20 @@ const router = express.Router();
 
 const todayAsDateString = () => new Date().toLocaleDateString('en-CA');
 
+function canEditTransaction(user, transaction) {
+    if (!transaction || transaction.empresaId !== user.empresaId) return false;
+    if (user.isAdminUser) return true;
+    return new Date(transaction.fecha).toLocaleDateString('en-CA') === todayAsDateString();
+}
+
+function canCancelTransaction(user, transaction) {
+    if (!transaction || transaction.empresaId !== user.empresaId) return false;
+    if (user.isAdminUser) return true;
+    const isRestrictedOperation = transaction.tipo === 'entrada'
+        && (transaction.categoria === 'empenio' || transaction.categoria === 'venta');
+    return canEditTransaction(user, transaction) && !isRestrictedOperation;
+}
+
 let transaccionesLossColumnReady = null;
 
 async function ensureTransaccionesLossColumn() {
@@ -124,23 +138,25 @@ async function getConfigCaja(empresaId) {
 router.get('/', async (req, res) => {
     try {
         const empresaId = req.session.user.empresaId;
-        let { filtro, fecha, mes } = req.query;
+        let { filtro, fecha, mes, q, categoriaFiltro } = req.query;
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(50, Math.max(10, Number.parseInt(req.query.limit, 10) || 25));
         const today = new Date();
         let rows = [];
         let fechaValue = fecha;
         let mesValue = mes;
-        console.log('Filtro:', filtro, 'Fecha:', fecha, 'Mes:', mes);
         const isAdmin = req.session.user.isAdminUser;
+        let baseQuery = 'SELECT * FROM Transacciones WHERE empresaId = ?';
+        let baseParams = [empresaId];
         const estadoFilter = isAdmin ? '' : " AND estado = 'activa'";
+        baseQuery += estadoFilter;
         if (!filtro || filtro === 'dia') {
             // Filtro por día (por defecto)
             if (!fecha) {
                 fechaValue = today.toLocaleDateString('en-CA');
             }
-            [rows] = await pool.query(
-                'SELECT * FROM Transacciones WHERE DATE(fecha) = ? AND empresaId=?' + estadoFilter + ' ORDER BY fecha ASC',
-                [fechaValue, req.session.user.empresaId]
-            );
+            baseQuery += ' AND DATE(fecha) = ?';
+            baseParams.push(fechaValue);
         } else if (filtro === 'mes') {
             // Filtro por mes
             if (!mes) {
@@ -149,19 +165,42 @@ router.get('/', async (req, res) => {
                 mesValue = `${year}-${month}`;
             }
             const [year, month] = mesValue.split('-');
-            [rows] = await pool.query(
-                'SELECT * FROM Transacciones WHERE YEAR(fecha) = ? AND MONTH(fecha) = ? AND empresaId=?' + estadoFilter + ' ORDER BY fecha ASC',
-                [year, month, req.session.user.empresaId]
-            );
+            baseQuery += ' AND YEAR(fecha) = ? AND MONTH(fecha) = ?';
+            baseParams.push(year, month);
         }
+        if (q?.trim()) {
+            baseQuery += ' AND (descripcion LIKE ? OR categoria LIKE ? OR nota LIKE ?)';
+            const search = `%${q.trim()}%`;
+            baseParams.push(search, search, search);
+        }
+        if (categoriaFiltro && categoriaFiltro !== 'Todas las categorías') {
+            baseQuery += ' AND categoria = ?';
+            baseParams.push(categoriaFiltro);
+        }
+        const [countRows] = await pool.query(
+            baseQuery.replace('SELECT *', 'SELECT COUNT(*) AS total'),
+            baseParams
+        );
+        const total = Number(countRows[0]?.total || 0);
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        const currentPage = Math.min(page, totalPages);
+        [rows] = await pool.query(
+            `${baseQuery} ORDER BY fecha ASC LIMIT ${limit} OFFSET ${(currentPage - 1) * limit}`,
+            baseParams
+        );
         //quiero mandar como parametro el nombre del usuario que realizó cada transacción para mostrarlo en la tabla, el id del usuario está en la tabla transacciones pero no su nombre, entonces tengo que hacer un join con la tabla usuarios para obtener el nombre del usuario asociado a cada transacción
-        rows = await Promise.all(rows.map(async (transaccion) => {
-            const [usuarioRows] = await pool.query('SELECT nombre FROM usuarios WHERE id = ? LIMIT 1', [transaccion.usuarioId]);
-            const nombreUsuario = usuarioRows.length ? usuarioRows[0].nombre : 'Desconocido';
-            return { ...transaccion, nombreUsuario };
-        }));
-        console.log('Transacciones obtenidas:', rows.length);
-        console.log('Usuario en sesión:', req.session.user.nombre);
+        if (rows.length) {
+            const ids = rows.map((row) => row.usuarioId);
+            const [usuarios] = await pool.query(
+                'SELECT id, nombre FROM usuarios WHERE id IN (?)',
+                [ids]
+            );
+            const nombres = new Map(usuarios.map((usuario) => [usuario.id, usuario.nombre]));
+            rows = rows.map((transaccion) => ({
+                ...transaccion,
+                nombreUsuario: nombres.get(transaccion.usuarioId) || 'Desconocido'
+            }));
+        }
         await ensureFechaInicioSistemaColumn();
         const { saldoInicial, config } = await resolveSaldoInicial(empresaId, todayAsDateString());
         const [cierreHoyRows] = await pool.query(
@@ -172,6 +211,15 @@ router.get('/', async (req, res) => {
 
         const fechaHoy = today.toLocaleDateString('en-CA');
 
+        const filters = new URLSearchParams();
+        for (const [key, value] of Object.entries({ filtro: filtro || 'dia', fecha: fechaValue, mes: mesValue, q, categoriaFiltro, limit })) {
+            if (value) filters.set(key, String(value));
+        }
+        const urlForPage = (targetPage) => {
+            const params = new URLSearchParams(filters);
+            params.set('page', String(targetPage));
+            return `/cashflow?${params.toString()}`;
+        };
         res.render('cashflow.ejs', {
             transacciones: rows,
             filtro: filtro || 'dia',
@@ -182,7 +230,17 @@ router.get('/', async (req, res) => {
             cajaCerradaHoy: !!cierreHoy,
             resumenCaja: cierreHoy || null,
             saldoInicialDia: saldoInicial,
-            fechaInicioSistema: config.fecha_inicio_sistema || null
+            fechaInicioSistema: config.fecha_inicio_sistema || null,
+            q,
+            categoriaFiltro,
+            pagination: {
+                page: currentPage,
+                total,
+                totalPages,
+                urls: Object.fromEntries(Array.from({ length: totalPages }, (_, index) => [index + 1, urlForPage(index + 1)])),
+                previousUrl: urlForPage(Math.max(1, currentPage - 1)),
+                nextUrl: urlForPage(Math.min(totalPages, currentPage + 1))
+            }
         });
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -201,7 +259,12 @@ router.get('/transacciones-mes-actual', async (req, res) => {
             'SELECT t.*, u.nombre AS nombreUsuario FROM Transacciones t LEFT JOIN usuarios u ON t.usuarioId = u.id WHERE YEAR(t.fecha) = ? AND MONTH(t.fecha) = ? AND t.empresaId = ?' + estadoFilter + ' ORDER BY t.fecha ASC',
             [year, month, req.session.user.empresaId]
         );
-        res.json({ transacciones: rows });
+        const transacciones = rows.map((transaction) => ({
+            ...transaction,
+            puedeEditar: canEditTransaction(req.session.user, transaction),
+            puedeAnular: canCancelTransaction(req.session.user, transaction)
+        }));
+        res.json({ transacciones });
     
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -220,7 +283,12 @@ router.get('/transacciones-dia-actual', async (req, res) => {
             [fechaHoy, req.session.user.empresaId]
         );
 
-        res.json({ transacciones: rows, fecha: fechaHoy });
+        const transacciones = rows.map((transaction) => ({
+            ...transaction,
+            puedeEditar: canEditTransaction(req.session.user, transaction),
+            puedeAnular: canCancelTransaction(req.session.user, transaction)
+        }));
+        res.json({ transacciones, fecha: fechaHoy });
     } catch (error) {
         console.error('Error en la consulta:', error);
         res.status(500).json({ error: 'Error al obtener los datos del día' });
@@ -244,6 +312,17 @@ router.post('/guardar-transaccion', async (req, res) => {
     const montoPerdidaFinal = resultadoEsPerdida ? (monto_resultado !== undefined ? montoResultado : montoPerdida) : montoPerdida;
     const perdidaAplicada = tipo === 'entrada' ? montoPerdidaFinal : 0;
 
+    const tiposValidos = ['entrada', 'salida'];
+    const categoriasValidas = tipo === 'entrada'
+        ? ['empenio', 'venta', 'interes']
+        : ['prestamo', 'gasto', 'otro'];
+    const montoTotal = Number(monto);
+    if (!tiposValidos.includes(tipo) || !categoriasValidas.includes(categoria)
+        || !Number.isFinite(montoTotal) || montoTotal < 0
+        || !fecha || !descripcion?.trim()) {
+        return res.status(400).send('Los datos de la transacción no son válidos.');
+    }
+
     if ((isRecogida || isVenta || isInteres) && !empenioId && !sinEmpenio) {
         return res.status(400).send('Debe seleccionar el empeño asociado.');
     }
@@ -262,7 +341,7 @@ router.post('/guardar-transaccion', async (req, res) => {
             'INSERT INTO Transacciones (tipo, monto_total, monto_ganancia, monto_perdida, descripcion, categoria, fecha, usuarioId, empresaId, nota, id_empenio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 tipo,
-                monto,
+                 montoTotal,
                 montoGananciaFinal,
                 perdidaAplicada,
                 descripcion,
@@ -315,7 +394,7 @@ router.post('/editar-transaccion', async (req, res) => {
         await ensureTransaccionesLossColumn();
 
         const [currentRows] = await pool.execute(
-            'SELECT empresaId, COALESCE(monto_perdida, 0) AS monto_perdida FROM Transacciones WHERE id = ? LIMIT 1',
+            'SELECT empresaId, fecha, tipo, categoria, COALESCE(monto_perdida, 0) AS monto_perdida FROM Transacciones WHERE id = ? LIMIT 1',
             [id]
         );
 
@@ -324,10 +403,17 @@ router.post('/editar-transaccion', async (req, res) => {
         }
 
         const currentRow = currentRows[0];
+        if (!canEditTransaction(req.session.user, currentRow)) {
+            return res.status(403).send('No tienes permiso para editar esta transacción.');
+        }
         const montoGanancia = Number(ganancia || 0);
         const montoPerdida = tipo === 'entrada' ? Number(perdida || 0) : 0;
+        const montoTotal = Number(monto);
 
-        if (Number.isNaN(montoGanancia) || Number.isNaN(montoPerdida)) {
+        if (!Number.isFinite(montoTotal) || montoTotal < 0
+            || !Number.isFinite(montoGanancia) || montoGanancia < 0
+            || !Number.isFinite(montoPerdida) || montoPerdida < 0
+            || !descripcion?.trim()) {
             return res.status(400).send('Los montos ingresados no son válidos.');
         }
 
@@ -336,8 +422,8 @@ router.post('/editar-transaccion', async (req, res) => {
             await connection.beginTransaction();
 
             await connection.execute(
-                'UPDATE Transacciones SET tipo = ?, categoria = ?, monto_total = ?, monto_ganancia = ?, monto_perdida = ?, descripcion = ?, fecha = ?, nota = ? WHERE id = ?',
-                [tipo, categoria, monto, montoGanancia, montoPerdida, descripcion, fecha, nota || null, id]
+                'UPDATE Transacciones SET tipo = ?, categoria = ?, monto_total = ?, monto_ganancia = ?, monto_perdida = ?, descripcion = ?, fecha = ?, nota = ? WHERE id = ? AND empresaId = ?',
+                [tipo, categoria, montoTotal, montoGanancia, montoPerdida, descripcion, fecha, nota || null, id, req.session.user.empresaId]
             );
 
             const deltaCapital = Number(currentRow.monto_perdida || 0) - montoPerdida;
@@ -467,7 +553,7 @@ router.get('/resumen-dia', async (req, res) => {
                 IFNULL(SUM(CASE WHEN tipo = 'salida' THEN monto_total ELSE 0 END), 0) AS total_salidas,
                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN monto_ganancia ELSE 0 END), 0) AS ganancia_dia,
                                 IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN COALESCE(monto_perdida, 0) ELSE 0 END), 0) AS perdida_dia,
-                                IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN (monto_total - monto_ganancia ) ELSE -monto_total END), 0) AS delta_capital
+                                IFNULL(SUM(CASE WHEN tipo = 'entrada' THEN (monto_total - monto_ganancia - COALESCE(monto_perdida, 0)) ELSE -monto_total END), 0) AS delta_capital
               FROM Transacciones
               WHERE empresaId = ? AND DATE(fecha) = ? AND estado = 'activa'`,
             [empresaId, hoy]
@@ -516,6 +602,10 @@ router.post('/anular-transaccion', async (req, res) => {
 
         const transaccion = rows[0];
 
+        if (!canCancelTransaction(req.session.user, transaccion)) {
+            return res.status(403).send('No tienes permiso para anular esta transacción.');
+        }
+
         if (transaccion.estado === 'anulada') {
             return res.status(400).send('La transacción ya está anulada.');
         }
@@ -544,8 +634,8 @@ router.post('/anular-transaccion', async (req, res) => {
             }
 
             await connection.execute(
-                "UPDATE Transacciones SET estado = 'anulada' WHERE id = ?",
-                [id]
+                "UPDATE Transacciones SET estado = 'anulada' WHERE id = ? AND empresaId = ?",
+                [id, req.session.user.empresaId]
             );
 
             if (Number(transaccion.monto_perdida || 0) > 0) {

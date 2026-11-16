@@ -48,6 +48,8 @@ npm install
 
 ```bash
 PORT=3000
+TZ=America/Lima
+DB_TIMEZONE=-05:00
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
@@ -79,6 +81,8 @@ Si no se define un valor en `.env`, se utilizan estos valores predeterminados:
 | Variable | Predeterminado |
 |---|---|
 | `PORT` | `3000` |
+| `TZ` | `America/Lima` |
+| `DB_TIMEZONE` | `-05:00` |
 | `DB_HOST` | `localhost` |
 | `DB_PORT` | `3306` |
 | `DB_USER` | `root` |

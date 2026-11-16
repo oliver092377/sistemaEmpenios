@@ -1,3 +1,5 @@
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+
 document.addEventListener("DOMContentLoaded", function () {
     // Manejo dinámico del formulario de nueva transacción
     const typeSelect = document.getElementById("transactionType");
@@ -746,15 +748,16 @@ async function loadCurrentDayTransactions() {
                             ${(() => {
                                 const esRecogidaOVenta = transaccion.tipo === 'entrada' && (transaccion.categoria === 'empenio' || transaccion.categoria === 'venta');
                                 const isAdmin = window.isAdminUser;
-                                let html = `<button class="btn btn-sm btn-primary"
-                                    data-id="${transaccion.id}"
-                                    data-nota="${escapeHtml(transaccion.nota || '')}">
-                                    <i class="fas fa-edit"></i>
-                                </button>`;
-                                if (!esRecogidaOVenta || isAdmin) {
+                                 let html = transaccion.puedeEditar ? `<button class="btn btn-sm btn-primary"
+                                     data-id="${transaccion.id}"
+                                     data-nota="${escapeHtml(transaccion.nota || '')}">
+                                     <i class="fas fa-edit"></i>
+                                 </button>` : "";
+                                 if (transaccion.puedeAnular) {
                                     html += `<form action="/cashflow/anular-transaccion" method="POST" style="display:inline;" 
                                         onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
-                                        <input type="hidden" name="id" value="${transaccion.id}">
+                                         <input type="hidden" name="csrfToken" value="${csrfToken}">
+                                         <input type="hidden" name="id" value="${transaccion.id}">
                                         <button type="submit" class="btn btn-sm btn-danger">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -820,7 +823,10 @@ function setupCerrarCajaButton() {
         mensaje.textContent = "Cerrando caja...";
 
         try {
-            const resp = await fetch("/cashflow/cierre-caja", { method: "POST" });
+            const resp = await fetch("/cashflow/cierre-caja", {
+                method: "POST",
+                headers: { "X-CSRF-Token": csrfToken }
+            });
             const data = await resp.json();
 
             if (!resp.ok) {
@@ -890,18 +896,19 @@ async function loadCurrentMonthTransactions() {
                                         </td>
 
                                         <td>
-                                            <button class="btn btn-sm btn-primary"
-                                                data-id="${transaccion.id}"
-                                                data-nota="${escapeHtml(transaccion.nota || '')}">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <form action="/cashflow/anular-transaccion" method="POST" style="display:inline;" 
-                                                onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
-                                                <input type="hidden" name="id" value="${transaccion.id}">
-                                                <button type="submit" class="btn btn-sm btn-danger">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
+                                             ${transaccion.puedeEditar ? `<button class="btn btn-sm btn-primary"
+                                                 data-id="${transaccion.id}"
+                                                 data-nota="${escapeHtml(transaccion.nota || '')}">
+                                                 <i class="fas fa-edit"></i>
+                                             </button>` : ""}
+                                             ${transaccion.puedeAnular ? `<form action="/cashflow/anular-transaccion" method="POST" style="display:inline;"
+                                                 onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
+                                                  <input type="hidden" name="csrfToken" value="${csrfToken}">
+                                                  <input type="hidden" name="id" value="${transaccion.id}">
+                                                 <button type="submit" class="btn btn-sm btn-danger">
+                                                     <i class="fas fa-trash"></i>
+                                                 </button>
+                                             </form>` : ""}
                                         </td>
                                     </tr>
                                 `;

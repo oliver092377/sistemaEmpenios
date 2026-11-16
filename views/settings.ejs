@@ -26,6 +26,7 @@
                         </div>
                     <% } else { %>
                         <form action="/settings/caja" method="POST" class="row g-3">
+                            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                             <div class="col-12">
                                 <label class="form-label">Saldo inicial (solo para el primer cierre)</label>
                                 <input type="number" step="0.01" min="0" class="form-control" name="saldo_inicial_manual"

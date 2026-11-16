@@ -3,11 +3,8 @@
     <%- include('partials/sidebar', {currentPage: 'cashflow' }) %>
 
         <div class="main-content">
-            <h1>
-                <%= user ? user.rol || user.username : 'Invitado' %>
-            </h1>
             <!-- Page Heading -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                 <h1 class="h3 text-gray-800">Flujo de caja</h1>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
                     <i class="fas fa-plus me-2"></i>Nueva Transacción
@@ -24,6 +21,7 @@
                         <div class="card-body">
                             <!-- Formulario de transacción actualizado -->
                             <form action="/cashflow/guardar-transaccion" method="POST" id="transactionForm">
+                                <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                                 <input type="hidden" name="sin_empenio" id="sinEmpenioFlag" value="">
                                 <div class="row">
 
@@ -75,7 +73,7 @@
                                     </div>
 
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label" id="transactionAmountLabel">Monto Gananciass</label>
+                            <label class="form-label" id="transactionAmountLabel">Monto Ganancia</label>
                                         <input type="number" class="form-control" placeholder="S/ 0.00" step="0.01"
                                             name="monto_resultado" id="transactionMontoResultado">
                                     </div>
@@ -115,22 +113,28 @@
                     <div class="card shadow mb-4">
                         <div class="card-header py-3 d-flex justify-content-between align-items-center">
                             <h6 class="m-0 font-weight-bold text-primary">Historial de Transacciones</h6>
-                            <div class="d-flex">
-                                <input type="text" class="form-control me-2" placeholder="Buscar...">
-                                <select class="form-select me-2" style="width: 150px;">
-                                    <option>Todas las categorías</option>
-                                    <option>Recogida de Empeño</option>
-                                    <option>Préstamo</option>
-                                    <option>Venta</option>
-                                    <option>Gasto</option>
+                            <form class="d-flex flex-wrap gap-2" method="get" action="/cashflow" id="quickCashflowFilter">
+                                <input type="hidden" name="filtro" value="<%= filtro %>">
+                                <input type="hidden" name="fecha" value="<%= fecha || '' %>">
+                                <input type="hidden" name="mes" value="<%= mes || '' %>">
+                                <input type="search" name="q" class="form-control" placeholder="Buscar..." value="<%= q || '' %>" aria-label="Buscar transacciones">
+                                <select name="categoriaFiltro" class="form-select" style="width: min(180px, 100%);" aria-label="Filtrar por categoría">
+                                    <option value="">Todas las categorías</option>
+                                    <option value="empenio" <%= categoriaFiltro === 'empenio' ? 'selected' : '' %>>Recogida de Empeño</option>
+                                    <option value="prestamo" <%= categoriaFiltro === 'prestamo' ? 'selected' : '' %>>Préstamo</option>
+                                    <option value="venta" <%= categoriaFiltro === 'venta' ? 'selected' : '' %>>Venta</option>
+                                    <option value="gasto" <%= categoriaFiltro === 'gasto' ? 'selected' : '' %>>Gasto</option>
+                                    <option value="interes" <%= categoriaFiltro === 'interes' ? 'selected' : '' %>>Interés</option>
                                 </select>
-                                <button class="btn btn-outline-primary">
+                                <button type="submit" class="btn btn-outline-primary">
                                     <i class="fas fa-filter"></i>
                                 </button>
-                            </div>
+                            </form>
                         </div>
                         <div class="card-body">
                             <form class="row g-2 mb-3 align-items-end" method="get" action="/cashflow">
+                                <input type="hidden" name="q" value="<%= q || '' %>">
+                                <input type="hidden" name="categoriaFiltro" value="<%= categoriaFiltro || '' %>">
                                 <div class="col-auto">
                                     <label class="form-label mb-0">Filtrar por tipo de periodo:</label>
                                     <select class="form-select" name="filtro" id="filtroTipo"
@@ -174,6 +178,14 @@
                                 }
                                 document.addEventListener('DOMContentLoaded', function () {
                                     toggleFiltroInput();
+                                    const quickForm = document.getElementById('quickCashflowFilter');
+                                    const searchInput = quickForm?.querySelector('[name="q"]');
+                                    let searchTimer;
+                                    searchInput?.addEventListener('input', function () {
+                                        clearTimeout(searchTimer);
+                                        searchTimer = setTimeout(() => quickForm.requestSubmit(), 450);
+                                    });
+                                    quickForm?.querySelector('[name="categoriaFiltro"]')?.addEventListener('change', () => quickForm.requestSubmit());
                                 });
                             </script>
                             <div class="table-responsive">
@@ -259,6 +271,7 @@
                                                         <form action="/cashflow/anular-transaccion" method="POST"
                                                             style="display:inline;"
                                                             onsubmit="return confirm('¿Está seguro que desea anular esta transacción?');">
+                                                            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                                                             <input type="hidden" name="id" value="<%= transaccion.id %>">
                                                             <button type="submit" class="btn btn-sm btn-danger"><i
                                                                     class="fas fa-ban"></i></button>
@@ -274,17 +287,25 @@
                                 </table>
                             </div>
 
-                            <nav>
+                            <nav aria-label="Paginación de transacciones">
                                 <ul class="pagination justify-content-center">
-                                    <li class="page-item disabled">
-                                        <a class="page-link" href="#" tabindex="-1">Anterior</a>
-                                    </li>
-                                    <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                                    <li class="page-item"><a class="page-link" href="#">2</a></li>
-                                    <li class="page-item"><a class="page-link" href="#">3</a></li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="#">Siguiente</a>
-                                    </li>
+                                    <% if (pagination && pagination.totalPages > 1) { %>
+                                        <% if (pagination.page > 1) { %>
+                                            <li class="page-item"><a class="page-link" href="<%= pagination.previousUrl %>">Anterior</a></li>
+                                        <% } %>
+                                        <% for (let p = 1; p <= pagination.totalPages; p++) { %>
+                                            <% if (p <= 2 || p > pagination.totalPages - 2 || Math.abs(p - pagination.page) <= 1) { %>
+                                                <li class="page-item <%= p === pagination.page ? 'active' : '' %>">
+                                                    <a class="page-link" href="<%= pagination.urls[p] %>"><%= p %></a>
+                                                </li>
+                                            <% } else if (p === 3 || p === pagination.totalPages - 2) { %>
+                                                <li class="page-item disabled"><span class="page-link">…</span></li>
+                                            <% } %>
+                                        <% } %>
+                                        <% if (pagination.page < pagination.totalPages) { %>
+                                            <li class="page-item"><a class="page-link" href="<%= pagination.nextUrl %>">Siguiente</a></li>
+                                        <% } %>
+                                    <% } %>
                                 </ul>
                             </nav>
 
@@ -438,6 +459,7 @@
                 data-bs-backdrop="static" aria-hidden="true">
                 <div class="modal-dialog">
                     <form id="editTransactionForm" action="/cashflow/editar-transaccion" method="POST">
+                        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title" id="editTransactionModalLabel">Editar Transacción</h5>
@@ -508,6 +530,7 @@
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <form action="/empenio/guardar-empenio-con-transaccion" method="POST" id="newEmpenioFromCashflowForm">
+                            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                             <input type="hidden" name="monto_prestamo" id="modalMontoPrestamo">
                             <input type="hidden" name="fecha_prestamo" id="modalFechaPrestamo">
                             <input type="hidden" name="descripcion_prestamo" id="modalDescripcionPrestamo">
@@ -615,9 +638,6 @@
             <%- include('partials/scripts', {currentPage: 'cashflow' }) %>
                 <script>
                     const fechaInicioSistema = "<%= fechaInicioSistema ? (fechaInicioSistema instanceof Date ? fechaInicioSistema.toISOString().split('T')[0] : fechaInicioSistema) : 'No definida' %>";
-                    document.addEventListener('DOMContentLoaded', function () {
-                        loadCurrentMonthTransactions();
-                    });
                 </script>
                 </body>
 

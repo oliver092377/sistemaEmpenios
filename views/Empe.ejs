@@ -1,20 +1,20 @@
-<%- include('partials/header', {title: 'Flujo de Caja - Sistema de Empeños' , currentPage: 'empenio' }) %>
+<%- include('partials/header', {title: 'Empeños - Sistema de Empeños' , currentPage: 'empenio' }) %>
 
     <%- include('partials/sidebar', {currentPage: 'empenio' }) %>
 
         <div class="main-content">
             <!-- Page Heading -->
 
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                 <div>
                     <h1 class="h3 text-gray-800">Empeños</h1>
                     <% if(showAll) { %>
                         <small class="text-muted">Mostrando empeños de todas las empresas</small>
                         <% } %>
                 </div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-                    <i class="fas fa-plus me-2"></i>Nuevo Empeño
-                </button>
+                <!-- <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+                    <i class="fas fa-plus me-2"></i>Nuevo EmpeñoAaa
+                </button> -->
             </div>
 
             <% if(user && user.isAdminUser) { %>
@@ -32,7 +32,7 @@
                     <!-- Contenido específico de la página de flujo de caja -->
                     <div class="filters-container">
                         <h3>Filtros</h3>
-                        <form action="/empenio" method="GET" id="filterForm">
+                        <form action="/empenio" method="GET" id="filterForm" autocomplete="off">
                             <input type="text" name="nombres" placeholder="Buscar por nombre"
                                 value="<%= nombres || '' %>">
                             <input type="text" name="apellidos" placeholder="Buscar por apellidos"
@@ -44,14 +44,14 @@
                             <input type="number" name="monto" placeholder="Buscar por monto" value="<%= monto || '' %>">
                             <input type="hidden" id="showAllInput" name="showAll" value="">
 
-                            <button type="submit">Buscar</button>
-                            <a href="/empenio"><button type="button">Limpiar</button></a><br>
+                            <button type="button" id="clearFilters">Limpiar filtros</button>
                         </form>
+                        <small id="liveFilterStatus" class="text-muted d-block mt-2" aria-live="polite"></small>
                     </div>
 
                     <div class="total-section">
-                        <button id="calcularTotal">Calcular total</button>
-                        <div id="totalResultado">Total: S/0.00</div>
+                        <button id="calcularTotal" type="button">Actualizar total</button>
+                        <div id="totalResultado">Total activos (<%= totalActivos || 0 %>): S/<%= Number(totalMontoActivos || 0).toFixed(2) %></div>
                     </div>
                     <div class="row">
                         <div class="col-lg-12">
@@ -59,14 +59,8 @@
                                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                                     <h6 class="m-0 font-weight-bold text-primary">Lista de Empeños </h6>
                                 </div>
-                                <div class="card-body">
-                                    <!-- Formulario de transacción -->
-                                    <form>
-                                        <!-- Campos del formulario -->
-
-                                    </form>
-                                </div>
-                                <table>
+                                <div class="empenios-table-wrapper">
+                                <table class="table table-bordered table-hover align-middle mb-0">
                                     <thead>
                                         <tr>
                                             <th>ID</th>
@@ -77,13 +71,33 @@
                                             <th>Fecha</th>
                                             <th>Monto</th>
                                             <th>Estado</th>
-                                            <th>EmpresaXD</th>
+                                            <th>Empresa</th>
                                             <th>Acciones</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        <% empenios.forEach(emp=> { %>
-                                            <tr>
+                                        <tbody>
+                                            <% empenios.forEach(emp=> { %>
+                                            <%
+                                                const estadoClases = {
+                                                    'Activo': 'activo',
+                                                    'Recogido': 'recogido',
+                                                    'En venta': 'en-venta',
+                                                    'Vendido': 'vendido',
+                                                    'Finalizado': 'finalizado',
+                                                    'Anulado': 'anulado'
+                                                };
+                                                const estadoIconos = {
+                                                    'Activo': 'fa-circle-check',
+                                                    'Recogido': 'fa-box-open',
+                                                    'En venta': 'fa-tag',
+                                                    'Vendido': 'fa-cart-shopping',
+                                                    'Finalizado': 'fa-flag-checkered',
+                                                    'Anulado': 'fa-ban'
+                                                };
+                                                const estadoClase = estadoClases[emp.Estado] || 'desconocido';
+                                                const estadoIcono = estadoIconos[emp.Estado] || 'fa-circle-question';
+                                            %>
+                                            <tr class="pawn-row pawn-row-<%= estadoClase %>">
                                                 <td>
                                                     <%= emp.idEmpenios %>
                                                 </td>
@@ -105,7 +119,10 @@
                                                 <td>S/<%= emp.Monto.toFixed(2) %>
                                                 </td>
                                                 <td>
-                                                    <%= emp.Estado %>
+                                                    <span class="status-badge status-<%= estadoClase %>">
+                                                        <i class="fas <%= estadoIcono %>" aria-hidden="true"></i>
+                                                        <%= emp.Estado || 'Desconocido' %>
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     <%= emp.empresaNombre || 'Sin empresa' %>
@@ -136,6 +153,28 @@
                                             <% }); %>
                                     </tbody>
                                 </table>
+                                </div>
+                                <% if (pagination && pagination.totalPages > 1) { %>
+                                    <nav class="mt-3" aria-label="Paginación de empeños">
+                                        <ul class="pagination justify-content-center flex-wrap">
+                                            <% if (pagination.page > 1) { %>
+                                                <li class="page-item"><a class="page-link" href="<%= pagination.previousUrl %>">Anterior</a></li>
+                                            <% } %>
+                                            <% for (let p = 1; p <= pagination.totalPages; p++) { %>
+                                                <% if (p <= 2 || p > pagination.totalPages - 2 || Math.abs(p - pagination.page) <= 1) { %>
+                                                    <li class="page-item <%= p === pagination.page ? 'active' : '' %>">
+                                                        <a class="page-link" href="<%= pagination.urls[p] %>"><%= p %></a>
+                                                    </li>
+                                                <% } else if (p === 3 || p === pagination.totalPages - 2) { %>
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                <% } %>
+                                            <% } %>
+                                            <% if (pagination.page < pagination.totalPages) { %>
+                                                <li class="page-item"><a class="page-link" href="<%= pagination.nextUrl %>">Siguiente</a></li>
+                                            <% } %>
+                                        </ul>
+                                    </nav>
+                                <% } %>
 
                             </div>
                         </div>
@@ -149,31 +188,32 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <form action="/empenio/guardar-empenio" method="POST">
+                        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                         <div class="modal-header">
                             <h5 class="modal-title">Registrar Nuevo Empeño</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <label>Nombres:</label>
-                            <input type="text" name="nombres" required><br>
+                            <input type="text" class="form-control mb-3" name="nombres" required>
 
                             <label>Apellidos:</label>
-                            <input type="text" name="apellidos" required><br>
+                            <input type="text" class="form-control mb-3" name="apellidos" required>
 
                             <label>Artefacto:</label>
-                            <input type="text" name="artefacto" required><br>
+                            <input type="text" class="form-control mb-3" name="artefacto" required>
 
                             <label>Marca:</label>
-                            <input type="text" name="marca" required><br>
+                            <input type="text" class="form-control mb-3" name="marca" required>
 
                             <label>Fecha:</label>
-                            <input type="date" name="fecha" id="fecha" required><br>
+                            <input type="date" class="form-control mb-3" name="fecha" id="fecha" required>
 
                             <label>Monto:</label>
-                            <input type="number" name="monto" required><br>
+                            <input type="number" class="form-control mb-3" name="monto" min="0" step="0.01" required>
 
                             <label>Descripcion:</label>
-                            <textarea name="descripcion" rows="5" cols="54"></textarea><br>
+                            <textarea name="descripcion" class="form-control" rows="5"></textarea>
 
                         </div>
                         <div class="modal-footer">
@@ -192,6 +232,7 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <form id="editEmpenioForm" action="/empenio/actualizar-empenio/" method="POST">
+                        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                         <input type="hidden" name="idEmpenios" id="edit_idEmpenios">
                         <div class="modal-header">
                             <h5 class="modal-title">Editar Empeño</h5>
@@ -211,8 +252,7 @@
                             <label>Monto:</label>
                             <input type="number" class="form-control" name="monto" id="edit_monto" required>
                             <label>Descripcion:</label>
-                            <textarea name="descripcion" class="form-control" id="edit_descripcion" rows="5"
-                                cols="54"></textarea>
+                            <textarea name="descripcion" class="form-control" id="edit_descripcion" rows="5"></textarea>
                             <label>Estado:</label>
                             <select class="form-select" name="estado" id="edit_estado" required>
                                 <option value="Activo">Activo</option>
@@ -437,6 +477,36 @@
 
             <%- include('partials/scripts', {currentPage: 'empenio' }) %>
                 <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const form = document.getElementById('filterForm');
+                        const status = document.getElementById('liveFilterStatus');
+                        const clearButton = document.getElementById('clearFilters');
+                        if (!form) return;
+                        let timer;
+                        form.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
+                            input.addEventListener('input', () => {
+                                clearTimeout(timer);
+                                if (status) status.textContent = 'Buscando...';
+                                timer = setTimeout(() => {
+                                    const params = new URLSearchParams(new FormData(form));
+                                    params.delete('page');
+                                    if (document.getElementById('showAllEmpenios')?.checked) {
+                                        params.set('showAll', '1');
+                                    }
+                                    window.location.href = `${form.action}?${params.toString()}`;
+                                }, 450);
+                            });
+                        });
+                        clearButton?.addEventListener('click', () => {
+                            form.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
+                                input.value = '';
+                            });
+                            const showAll = document.getElementById('showAllEmpenios');
+                            if (showAll) showAll.checked = false;
+                            window.location.href = '/empenio';
+                        });
+                    });
+
                     // Handle showAll checkbox
                     document.addEventListener('DOMContentLoaded', function () {
                         const showAllCheckbox = document.getElementById('showAllEmpenios');
@@ -664,9 +734,10 @@
                                             try {
                                                 const resp = await fetch(`/empenio/${emp.idEmpenios}/interes`, {
                                                     method: 'DELETE',
-                                                    headers: {
-                                                        'Content-Type': 'application/json'
-                                                    },
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                                        },
                                                     body: JSON.stringify({
                                                         fecha: fechaStr,
                                                         monto: montoStr,
@@ -757,7 +828,8 @@
                                     const resp = await fetch(`/empenio/${currentInterestEmpenioId}/interes`, {
                                         method: 'PUT',
                                         headers: {
-                                            'Content-Type': 'application/json'
+                                            'Content-Type': 'application/json',
+                                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
                                         },
                                         body: JSON.stringify({
                                             originalFecha: originalInterestForEdit.fecha,
@@ -807,7 +879,8 @@
                                     const resp = await fetch(`/empenio/${currentInterestEmpenioId}/interes`, {
                                         method: 'POST',
                                         headers: {
-                                            'Content-Type': 'application/json'
+                                            'Content-Type': 'application/json',
+                                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
                                         },
                                         body: JSON.stringify({ fecha, monto, descripcion })
                                     });

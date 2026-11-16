@@ -1,50 +1,10 @@
 // Colorear filas según estado
 document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("tbody tr").forEach(row => {
-        let estado = row.cells[7].textContent.trim();
-        if (estado === "activo") {
-            row.style.backgroundColor = "#90EE90";
-        } else if (estado === "Recogido") {
-            row.style.backgroundColor = "#ADD8E6";
-        }
-        else if (estado === "Vendido") {
-            row.style.backgroundColor = "#ffcccc";
-        }
-    });
-
-    // Función para calcular el total de empeños activos
-    document.getElementById('calcularTotal').addEventListener('click', function () {
-        let total = 0;
-        const filas = document.querySelectorAll('tbody tr');
-        let contadorActivos = 0;
-
-        if (filas.length === 0) {
-            document.getElementById('totalResultado').textContent = "No hay empeños para calcular";
-            return;
-        }
-
-        filas.forEach(fila => {
-            // Verificar si el estado es "activo" (columna 7)
-            const estado = fila.cells[7].textContent.trim().toLowerCase();
-
-            if (estado === "activo") {
-                // Obtener el texto de la celda de monto (columna 6)
-                const montoTexto = fila.cells[6].textContent;
-                // Eliminar el símbolo de dólar si existe y convertir a número
-                const montoValor = parseFloat(montoTexto.replace('S/', ''));
-
-                if (!isNaN(montoValor)) {
-                    total += montoValor;
-                    contadorActivos++;
-                }
-            }
-        });
-
-        // Formatear el total como moneda
-        const mensaje = contadorActivos > 0
-            ? `Total activos (${contadorActivos}): S/${total.toFixed(2)}`
-            : "No hay empeños activos";
-
-        document.getElementById('totalResultado').textContent = mensaje;
-    });
+    // El total se calcula en backend sobre todos los resultados filtrados,
+    // no solamente sobre la página visible.
+    const totalButton = document.getElementById('calcularTotal');
+    if (totalButton) {
+        totalButton.disabled = true;
+        totalButton.title = 'El total se actualiza automáticamente con los filtros';
+    }
 });

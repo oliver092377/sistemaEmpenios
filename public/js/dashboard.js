@@ -2,6 +2,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const dashboardElement = document.getElementById("dashboard-data");
 
+    if (!dashboardElement) {
+        return;
+    }
+
     const dashboardData = JSON.parse(
         dashboardElement.dataset.dashboard
     );
