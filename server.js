@@ -20,6 +20,10 @@ if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET es obligatorio en producción.');
 }
 
+// Railway termina HTTPS en su proxy; Express debe confiar en ese proxy
+// para poder emitir correctamente cookies de sesión con `secure: true`.
+app.set('trust proxy', 1);
+
 app.use(express.urlencoded({ extended: true })); // Para datos de formularios
 app.use(express.json()); // Para datos en formato JSON
 app.use(express.static('public'));
